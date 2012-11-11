@@ -1,0 +1,69 @@
+The =sobrieti= IRC bot plugins for supybot
+
+* Overview
+
+The =sobrieiti= bot is composed of 
+
+ - [[https://github.com/frumiousbandersnatch/supybot-code][supybot-code]] :: a lightly modified version of supybot
+
+ - [[https://github.com/frumiousbandersnatch/supybot-plugins][subybot-plugins]] :: lightly modified versions of code4lib's
+   collection of plugins
+
+ - [[https://github.com/frumiousbandersnatch/sobrieti-plugins][sobrieti-plugins]] :: this package, which contains sobrieti-specific
+    plugins
+
+* Installation and Configuration
+
+** Install supybot
+
+Install supybot like normal but pull from the above fork.  Setting up
+the virtual env is optional but allows to install as a normal user.
+
+#+BEGIN_SRC sh
+virtualenv --system-site-packages $HOME/venv/supybot
+source $HOME/venv/supybot/bin/activiate
+git clone git@github.com:frumiousbandersnatch/supybot-code.git
+cd supybot-code
+python setup build
+python setup install
+#+END_SRC
+
+** Install the plugins
+
+The plugins can be used directly from their checked out locations.
+
+#+BEGIN_SRC sh
+git clone git@github.com:frumiousbandersnatch/supybot-plugins.git
+git clone git@github.com:frumiousbandersnatch/sobrieti-plugins.git
+#+END_SRC
+
+** Configuration
+
+Configure supybot as usual and then add all the individual =plugins/=
+directories from the above locations to the
+=supybot.directories.plugins= variable in the =.conf= file created for
+you by the =supybot-wizard=.  Note, if you are running the bot when
+you make this edit you need to issue a =config reload= to pick up the
+manual edit.
+
+* History
+
+=sobrieti= is based on the same named [[https://github.com/frumiousbandersnatch/sobrieti][sobrieti]] bot based on a
+derivative of phenny/jenni.
+
+* Links
+
+ - http://supybook.fealdia.org/
+
+* Git juggling
+
+The cloaning of upstream into GitHub. 
+
+#+BEGIN_EXAMPLE
+git init
+git remote add upstream git://git.code.sf.net/p/supybot/code
+git fetch upstream
+git remote add github git@github.com:frumiousbandersnatch/supybot-code.git
+git checkout -b sobrieti upstream/master
+git push github sobrieti
+#+END_EXAMPLE
