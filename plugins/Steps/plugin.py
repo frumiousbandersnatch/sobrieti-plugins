@@ -45,8 +45,9 @@ def get_flavor_mod(flavor):
 
     for modname in steps.__all__:
         mod = steps.__dict__[modname]
-        if flavor in [mod.name] + mod.abbrevs:
-            return mod
+        for maybe in [modname, mod.name] + mod.abbrevs:
+            if maybe.lower() == flavor.lower():
+                return mod
     return None
 
 

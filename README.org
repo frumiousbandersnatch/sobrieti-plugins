@@ -6,9 +6,6 @@ The =sobrieiti= bot is composed of
 
  - [[https://github.com/frumiousbandersnatch/supybot-code][supybot-code]] :: a lightly modified version of supybot
 
- - [[https://github.com/frumiousbandersnatch/supybot-plugins][subybot-plugins]] :: lightly modified versions of code4lib's
-   collection of plugins
-
  - [[https://github.com/frumiousbandersnatch/sobrieti-plugins][sobrieti-plugins]] :: this package, which contains sobrieti-specific
     plugins
 
@@ -33,23 +30,117 @@ python setup install
 The plugins can be used directly from their checked out locations.
 
 #+BEGIN_SRC sh
-git clone git@github.com:frumiousbandersnatch/supybot-plugins.git
 git clone git@github.com:frumiousbandersnatch/sobrieti-plugins.git
 #+END_SRC
 
 ** Configuration
 
-Configure supybot as usual and then add all the individual =plugins/=
-directories from the above locations to the
-=supybot.directories.plugins= variable in the =.conf= file created for
-you by the =supybot-wizard=.  Note, if you are running the bot when
-you make this edit you need to issue a =config reload= to pick up the
-manual edit.
+Use the =supybot-wizard= to populate a directory with a configuration
+file and the other directories and files in the usual manner.
+Additional configuration is below.  This can be done by editing the
+=.conf= file or from inside IRC after you have identified as the
+owner.
+
+ - =supybot.directories.plugins= :: append the location of the
+      =plugins/= directory from this package
+
+ - =supybot.reply.whenAddressedBy.strings= :: explicitly add some
+      prefixes with the bot's nick like: =sobrieti,= and =sobrieti:=
+      and see next.
+
+- =supybot.reply.whenAddressedBy.nick= :: set to =False=.  Coupled
+     with the above this will keep the bot from treating casual
+     conversation like "sobrieti rocks" as a directive to run the
+     (possibly nonexistent) =rocks= commandd.
+
 
 * History
 
 =sobrieti= is based on the same named [[https://github.com/frumiousbandersnatch/sobrieti][sobrieti]] bot based on a
 derivative of phenny/jenni.
+
+
+* Plugins
+
+** The Sobrieti Plugins
+
+What makes =sobrieti= unique are a few modules in support of the
+=#stopdrinking= channel on Snoonet.
+
+ - Dice :: let the bot provide some randomness into your life
+
+ - Snoo :: interact with reddit
+
+ - Steps :: display some tenets of recovery of varying questionability
+
+** External Plugins
+
+Some plugins come from elsewhere but are tracked here and possibly
+modified.
+
+ - Markov :: Markov-chain based shenanigans.  Tracked as a [[https://github.com/apenwarr/git-subtree][git-subtree]]
+             from git://git.jamessan.com/Supybot/Markov.git
+
+** To port
+
+Some functionality of the original phenny-based sobrieti has yet to be
+ported to the supybot-based one.
+
+Functions:
+
+ - cleverbot :: (=.cb=) channelling CleverBot
+
+ - etymology :: (=.ety=) word origins.  The =edsu-plugins= have one.
+
+ - factoid :: (=.factoid=) there are several factoid type packages
+              available.  Several from code4lib but which require old
+              sqlite.  This also has a non-function interface.  The
+              current corpus should be converted.
+
+ - markov :: (=.imitate=) generate verbiage based on someones recent
+             messages.  Others: [[http://ubottu.com/stdin/supydocs/plugins/Markov.html][ubottu's markov]]
+
+ - movie :: (=.movie=) interface to =imdbapi= (rarely used)
+
+ - oblique :: (=.o=) various offloaded functionality
+
+ - remind :: (=.in=) reminds people to do something at a later time.
+
+ - scores :: (=.addpoint=) upboats for everyone
+
+ - slap :: (=.slap= / =.love=) deliver some negative/positive reinforcement
+
+ - urbandictionary :: (=.ud=) lookups in Urban Dictionary
+
+ - units :: (=.convert=) there is already =math convert= but it works
+            slightly differently
+
+ - weather :: (=.weather=) show the current weather (best to defer to RocksBot?)
+
+ - why :: (=.why=) spew bizarrities
+
+ - wiki :: (=.w= and =.wiki=) interface to Wiktionary and Wikipedia
+
+ - wolframalpha :: (=.wa=) interface to Wolfram Alpha
+
+Behavior:
+
+ - factoid :: (=foo IS bar=) see above
+
+ - urls :: watch for URLs and respond with a summary of what is at the
+           link.  The Web module handles this.
+
+ - responses :: canned responses to certain phrases ("lol", "brb").  
+
+** Recomended plugins:
+
+#+BEGIN_EXAMPLE
+<frumious> list
+<frumpy> Admin, Alias, Channel, Config, Dice, Games, Google, Herald,
+Later, Math, Misc, News, Note, Owner, Quote, Seen, Snoo, Status,
+Steps, String, Time, Topic, URL, and User
+#+END_EXAMPLE
+
 
 * Links
 

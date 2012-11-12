@@ -104,10 +104,18 @@ def poetry(red, nwords, nskip):
                 continue
             if word.startswith('(') and word.endswith(')'):
                 continue
+            if word.startswith('[') and word.endswith(')'):
+                continue        # markdown links
+            if word.startswith('(') and word.endswith(']'):
+                continue        # markdown typo links
             if word.startswith('"') or word.endswith('"'):
                 word = word.replace('"','')
             if word.startswith("'") or word.endswith("'"):
                 word = word.replace("'",'')
+            if word.endswith('.'):
+                word = word.replace('.','')
+
+
             word = word.lower()
             word = word.replace(',','')
             word = word.replace('.','')
@@ -264,9 +272,8 @@ class Snoo(callbacks.Plugin):
                 continue
             ret.append(name)
         return ret
-
-
-    def flair(self, irc, msg, args, name1, name2):
+        
+    def _real_flair(self, irc, msg, args, name1, name2):
         """[<redditor> and/or r/<subreddit>]
 
         Show some flair.
@@ -301,7 +308,20 @@ class Snoo(callbacks.Plugin):
         irc.reply('%s has no flair in %s and that is okay.' % \
                       (red,sub.display_name))
         return
-    flair = wrap(flair, [optional('something'), optional('something')])
+    flair = wrap(_real_flair, [optional('something'), optional('something')])
+
+    def coin(self, irc, msg, args, name):
+        """[<name>]"
+
+        Show you or another's flair from the default subreddit.  See
+        the flair command for a more general command.
+        """
+        if not name:
+            name = msg.nick
+        subname = self.registryValue('subreddit')
+        self._real_flair(irc, msg, args, name, subname)
+        return
+    coin = wrap(coin, [optional("something")])
 
     def get_redditor(self, name):
         """Try to return reddtor object."""

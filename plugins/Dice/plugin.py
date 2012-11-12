@@ -59,6 +59,16 @@ class Dice(callbacks.Plugin):
         irc.reply(resp)
     dice = wrap(dice, [optional('int',2)])
 
+    def ask(self, irc, msg, args, stuff):
+        """Ask a yes or no question or a 'this or that or the other'"""
+        if 'or' in stuff:
+            stuff = ' '.join(stuff).split('or')
+            res = random.choice(stuff).strip().encode('utf-8')
+        else:
+            res = random.choice(['yes', 'no'])
+
+        irc.reply(res)
+    ask = wrap(ask, [many('something')])
 
     pass
 
