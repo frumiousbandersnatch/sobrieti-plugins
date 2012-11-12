@@ -59,6 +59,77 @@ def awkwardly_pick_rs(name1, name2, defred, defsub):
     return (defred, defsub)
 
 
+import collections, random
+
+def generate_poem(red, ngrams, nwords, nskip):
+    prev = None
+    ret = []
+    while nwords:
+        words = ngrams[prev][1:]
+        #print 'ngrams["%s"] = "%s"' % (prev, words)
+        if not words:
+            return 'ERROR, something is wrong, no words from %s' % red.name
+        prev = random.choice(words)
+        if not prev: 
+            return 'ERROR, no poem for you (%s)' % str(words)
+        if nskip:
+            nskip -= 1
+            continue
+        ret.append(prev)
+        nwords -= 1
+        continue
+    poem = ' '.join(ret)
+    return poem
+
+def poetry(red, nwords, nskip):
+    '''
+    Generate poetry form the user's recent comments
+    '''
+
+    corpus = []
+    try:
+        overview = [o for o in red.get_overview()]
+    except KeyError:
+        return 'ERROR, failed to get overview for "%s"' % red.name
+
+    for o in overview:
+        line = str(o).strip()
+        for word in line.split():
+            word = word.strip()
+            if word.endswith('...'): 
+                continue # some shortening by praw?
+            if word.startswith('&') and word.endswith(';'):
+                continue # skip HTML entities that can creep in
+            if word.startswith('[') and word.endswith(']'):
+                continue
+            if word.startswith('(') and word.endswith(')'):
+                continue
+            if word.startswith('"') or word.endswith('"'):
+                word = word.replace('"','')
+            if word.startswith("'") or word.endswith("'"):
+                word = word.replace("'",'')
+            word = word.lower()
+            word = word.replace(',','')
+            word = word.replace('.','')
+            if word.startswith("http:"): continue
+            if word.startswith("https:"): continue
+            if not word: continue
+            corpus.append(word)
+            #print 'add to corpus: "%s"' % word
+            continue
+        continue
+    
+    ngrams = collections.defaultdict(lambda: [None])
+    prev = None
+    for word in corpus:
+        ngrams[prev].append(word)
+        #print 'prev="%s", word="%s"' % (prev,word)
+        prev = word
+        continue
+
+    #print 'got corpus of size %d' % len(ngrams)
+    return generate_poem(red, ngrams, nwords, nskip)
+
 rank_types = ['hot','new','top','controversial']
 rank_terms = ['week','month','year']
 
@@ -169,6 +240,32 @@ class Snoo(callbacks.Plugin):
     subscribers = wrap(subscribers, [optional("something")])
     stats = subscribers
 
+
+    def get_assoc_redditors(self, nick):
+        """Try to return the redditors associated with the nick."""
+
+        try:
+            user = ircdb.users.getUser(nick)
+        except KeyError:
+            return []
+
+        if not user:
+            if irc:
+                irc.reply('No associated redditor with: "%s"' % nick)
+            return []
+
+        ret = []
+        for assoc in user.associations:
+            try:
+                name, domain = assoc.split('|')
+            except ValueError:
+                continue
+            if domain != 'reddit':
+                continue
+            ret.append(name)
+        return ret
+
+
     def flair(self, irc, msg, args, name1, name2):
         """[<redditor> and/or r/<subreddit>]
 
@@ -191,15 +288,7 @@ class Snoo(callbacks.Plugin):
             return
 
         # try again with an association
-
-        user = ircdb.users.getUser(msg.nick)
-        for assoc in user.associations:
-            try:
-                name, domain = assoc.split('|')
-            except ValueError:
-                continue
-            if domain != 'reddit':
-                continue
+        for name in self.get_assoc_redditors(red):
             f = sub.get_flair(name)
             if not f['flair_text']:
                 continue
@@ -208,10 +297,49 @@ class Snoo(callbacks.Plugin):
                           (red, name, f['flair_text'], sub.display_name),
                       prefixNick=False)
             return
+
         irc.reply('%s has no flair in %s and that is okay.' % \
                       (red,sub.display_name))
         return
     flair = wrap(flair, [optional('something'), optional('something')])
+
+    def get_redditor(self, name):
+        """Try to return reddtor object."""
+        maybe = [name]
+        assoc = self.get_assoc_redditors(name)
+        if assoc:
+            maybe = assoc
+
+        for name in maybe:
+            try:
+                red = reddit.get_redditor(name)
+            except praw.HTTPError:
+                continue
+            else:
+                return red
+        return 
+
+    def poem(self, irc, msg, args, name, nwords, nskip):
+        """<name> [<nwords> [<nskip>]]
+
+        Generate a poem based on recent reddit comments by <name>.
+        Optionally specify how many <nwords> to generate and how many
+        words to <nskip> in the corpus.
+        """
+        if not name:
+            name = msg.nick
+        red = self.get_redditor(name)
+        if not red:
+            irc.reply('failed to find "%s" on reddit' % name)
+            return
+
+        msg = poetry(red, nwords, nskip)
+        irc.reply('<%s> %s' % (name, msg), prefixNick=False)
+        return
+
+    poem = wrap(poem, ['something',
+                       optional('int',10),
+                       optional('int',5)])
 
 Class = Snoo
 
