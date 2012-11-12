@@ -59,10 +59,115 @@ def awkwardly_pick_rs(name1, name2, defred, defsub):
     return (defred, defsub)
 
 
+rank_types = ['hot','new','top','controversial']
+rank_terms = ['week','month','year']
+
 class Snoo(callbacks.Plugin):
     """Interact with reddit"""
     threaded = True
 
+
+    def __init__(self, irc):
+        self.__parent = super(Snoo, self)
+        self.__parent.__init__(irc)
+        self.subcache = {}
+
+    def get_sub(self, name, irc = None):
+        if not name:
+            name = self.registryValue('subreddit')
+        if name.startswith('r/'):
+            name = name[2:]
+        if not name:
+            return
+
+        sub = self.subcache.get(name)
+        if not sub:
+            sub = reddit.get_subreddit(name)
+        if not sub:
+            return 
+
+        try:
+            cid = sub.content_id    # trigger error
+        except ValueError:
+            if irc:
+                irc.reply('r/%s does not appear to exist' % name)
+            return
+        except praw.HTTPError:
+            if irc:
+                irc.reply('failed to load r/%s' % name)
+            return
+
+        self.subcache[name] = sub
+        return sub
+
+    def rank(self, irc, msg, args, type, term, name):
+        """[<subreddit> [<type>] [<term>]]]
+
+        Show the ranking post of the <subreddit> of rank <type> over
+        given time <term>.
+        """
+        if not type:
+            type = 'top'
+        if term and type not in ['hot','new']:
+            _term_ = '_from_' + term
+            rankstr = '%s (%s)' % (type,term)
+        else:
+            _term_ = ''
+            rankstr = type
+
+        sub = self.get_sub(name, irc)
+        if not sub: return
+
+        methname = 'sub.get_%s%s' % (type,_term_)
+        meth = eval(methname)
+
+        lst = meth(1)
+        try:
+            lst = [x for x in lst]
+        except ValueError,err:
+            irc.reply("reddit barfed, sorry")
+            return
+
+        if not len(lst):
+            irc.reply('Weird, no %s entries' % type)
+            return
+        
+        first = lst[0]
+        
+        flair = ''
+        if first.author_flair_text:
+            flair = ' (%s)' % first.author_flair_text
+
+        score = '(+%d/-%d)' % (first.ups, first.downs)
+
+        msg = '%s in r/%s %s: "%s" by %s%s <http://redd.it/%s>' % \
+            (rankstr.capitalize(), sub.display_name, score,
+             first.title, first.author, flair, first.id)
+        irc.reply(msg, prefixNick=False)
+        return
+
+    rank = wrap(rank, [
+            optional(('literal',rank_types)),
+            optional(('literal',rank_terms)),
+            optional('something'), 
+            ])
+
+    def subscribers(self, irc, msg, args, name):
+        """[<subreddit>]
+
+        Show the number of subcribers to the given subreddit.
+        """
+        sub = self.get_sub(name, irc)
+        if not sub: return
+
+        ns = sub.subscribers
+        aa = sub.accounts_active
+        irc.reply('%s has %d subscribers of which %d recently visited' % \
+                      (sub.display_name, ns, aa),
+                  prefixNick=False)
+        return
+    subscribers = wrap(subscribers, [optional("something")])
+    stats = subscribers
 
     def flair(self, irc, msg, args, name1, name2):
         """[<redditor> and/or r/<subreddit>]
@@ -72,41 +177,39 @@ class Snoo(callbacks.Plugin):
         defnick = msg.nick 
         defsub = self.registryValue('subreddit')
 
-        red, sub = awkwardly_pick_rs(name1,name2, defnick, defsub)
+        red, subname = awkwardly_pick_rs(name1,name2, defnick, defsub)
 
-        print 'red="%s", sub="%s", name1=%s, name2=%s, nick=%s, sub=%s' %\
-            (red,sub,name1,name2,defnick,defsub)
+        sub = self.get_sub(subname, irc)
+        if not sub: return 
 
-        subreddit = reddit.get_subreddit(sub)
-        f = subreddit.get_flair(red)
+        f = sub.get_flair(red)
 
         if f['flair_text']:
-            irc.reply('%s has %s with %s' % (red, f['flair_text'], sub),
+            irc.reply('%s has %s with %s' % \
+                          (red, f['flair_text'], sub.display_name),
                       prefixNick=False)
             return
 
         # try again with an association
 
         user = ircdb.users.getUser(msg.nick)
-        print 'USER: "%s"' % user
-        print '\tASSOCIATIONS: "%s"' % str(user.associations)
         for assoc in user.associations:
-            print '\tASSOC: "%s"' % assoc
             try:
                 name, domain = assoc.split('|')
             except ValueError:
                 continue
             if domain != 'reddit':
                 continue
-            f = subreddit.get_flair(name)
+            f = sub.get_flair(name)
             if not f['flair_text']:
                 continue
 
             irc.reply('%s (as %s) has %s with %s' % \
-                          (red, name, f['flair_text'], sub),
+                          (red, name, f['flair_text'], sub.display_name),
                       prefixNick=False)
             return
-        irc.reply('%s has no flair in %s and that is okay.' % (red,sub))
+        irc.reply('%s has no flair in %s and that is okay.' % \
+                      (red,sub.display_name))
         return
     flair = wrap(flair, [optional('something'), optional('something')])
 
