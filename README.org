@@ -81,24 +81,19 @@ modified.
  - Markov :: Markov-chain based shenanigans.  Tracked as a [[https://github.com/apenwarr/git-subtree][git-subtree]]
              from git://git.jamessan.com/Supybot/Markov.git
 
+ - Etymology :: copied from =edsu-plugins=
+
 ** To port
 
 Some functionality of the original phenny-based sobrieti has yet to be
 ported to the supybot-based one.
 
-Functions:
-
  - cleverbot :: (=.cb=) channelling CleverBot
-
- - etymology :: (=.ety=) word origins.  The =edsu-plugins= have one.
 
  - factoid :: (=.factoid=) there are several factoid type packages
               available.  Several from code4lib but which require old
               sqlite.  This also has a non-function interface.  The
               current corpus should be converted.
-
- - markov :: (=.imitate=) generate verbiage based on someones recent
-             messages.  Others: [[http://ubottu.com/stdin/supydocs/plugins/Markov.html][ubottu's markov]]
 
  - movie :: (=.movie=) interface to =imdbapi= (rarely used)
 
@@ -123,14 +118,19 @@ Functions:
 
  - wolframalpha :: (=.wa=) interface to Wolfram Alpha
 
-Behavior:
+ - responses :: canned responses to certain phrases ("lol", "brb").  
 
- - factoid :: (=foo IS bar=) see above
+** Ported
 
  - urls :: watch for URLs and respond with a summary of what is at the
            link.  The Web module handles this.
 
- - responses :: canned responses to certain phrases ("lol", "brb").  
+ - etymology :: (=.ety=) word origins.  The =edsu-plugins= have one.
+                The Etymology module handles this.
+
+ - markov :: (=.imitate=) generate verbiage based on someones recent
+             messages.  The Markov module handles this.
+
 
 ** Recomended plugins:
 
