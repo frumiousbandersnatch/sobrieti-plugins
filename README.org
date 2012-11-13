@@ -67,11 +67,16 @@ derivative of phenny/jenni.
 What makes =sobrieti= unique are a few modules in support of the
 =#stopdrinking= channel on Snoonet.
 
- - Dice :: let the bot provide some randomness into your life
-
  - Snoo :: interact with reddit
 
  - Steps :: display some tenets of recovery of varying questionability
+
+Not much to do with sobrieti but these packages are written for her.
+
+ - Dice :: let the bot provide some randomness into your life
+
+ - Urban :: urbandictionary.com interface
+
 
 ** External Plugins
 
