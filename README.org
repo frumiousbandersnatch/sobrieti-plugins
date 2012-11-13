@@ -83,6 +83,8 @@ modified.
 
  - Etymology :: copied from =edsu-plugins=
 
+ - Remind :: copied from [[http://www.kreativekorp.com/swdownload/supybot/Remind.zip][here]]
+
 ** To port
 
 Some functionality of the original phenny-based sobrieti has yet to be
@@ -97,9 +99,7 @@ ported to the supybot-based one.
 
  - movie :: (=.movie=) interface to =imdbapi= (rarely used)
 
- - oblique :: (=.o=) various offloaded functionality
-
- - remind :: (=.in=) reminds people to do something at a later time.
+ - oblique :: (=.o=) various offloaded functionality (unlikely to port)
 
  - scores :: (=.addpoint=) upboats for everyone
 
@@ -130,6 +130,9 @@ ported to the supybot-based one.
 
  - markov :: (=.imitate=) generate verbiage based on someones recent
              messages.  The Markov module handles this.
+
+ - remind :: (=.in=) reminds people to do something at a later time.
+             The Remind module handles this.
 
 
 ** Recomended plugins:
