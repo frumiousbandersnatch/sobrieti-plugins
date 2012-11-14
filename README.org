@@ -110,10 +110,8 @@ ported to the supybot-based one.
 
  - slap :: (=.slap= / =.love=) deliver some negative/positive reinforcement
 
- - urbandictionary :: (=.ud=) lookups in Urban Dictionary
-
  - units :: (=.convert=) there is already =math convert= but it works
-            slightly differently
+            slightly differently (live with it?)
 
  - weather :: (=.weather=) show the current weather (best to defer to RocksBot?)
 
@@ -139,6 +137,8 @@ ported to the supybot-based one.
  - remind :: (=.in=) reminds people to do something at a later time.
              The Remind module handles this.
 
+ - urbandictionary :: (=.ud=) lookups in Urban Dictionary. The Urban
+      module handles this.
 
 ** Recomended plugins:
 
@@ -166,3 +166,8 @@ git remote add github git@github.com:frumiousbandersnatch/supybot-code.git
 git checkout -b sobrieti upstream/master
 git push github sobrieti
 #+END_EXAMPLE
+
+* Ideas
+
+ - add to Snoo to find recent posts commented and report how many
+   comments were added after yours.  Best sent via /msg.
