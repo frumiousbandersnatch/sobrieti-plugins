@@ -1,1 +1,2 @@
-Insert a description of your plugin here, with any notes, etc. about using it.
+Keep score of things in a channel in the form of up/down votes.
+
