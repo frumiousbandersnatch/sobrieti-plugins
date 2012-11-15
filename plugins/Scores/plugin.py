@@ -124,8 +124,8 @@ class Scores(callbacks.Plugin, plugins.ChannelDBHandler):
         res = self._get(channel,thing)
         res.ups += 1
         self.getDb(channel).set(res.id, res)
-        print 'SCORES:', res.id, res
-        print self.getDb(channel).map
+        #print 'SCORES:', res.id, res
+        #print self.getDb(channel).map
         self._score(irc, msg, args, channel, thing)
         return
     addpoint = wrap(addpoint, ['channel', many('something')])

@@ -171,3 +171,6 @@ git push github sobrieti
 
  - add to Snoo to find recent posts commented and report how many
    comments were added after yours.  Best sent via /msg.
+
+ - add =--all= option to =seen= to show last seen over all monitored
+   chans.
