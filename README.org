@@ -174,3 +174,7 @@ git push github sobrieti
 
  - add =--all= option to =seen= to show last seen over all monitored
    chans.
+
+ - bash-like service using gist for display and storage.
+
+ - reply to =<botname>!=

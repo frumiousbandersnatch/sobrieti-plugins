@@ -36,6 +36,8 @@ import supybot.callbacks as callbacks
 
 import supybot.dbi as dbi
 
+import os                       # for renaming db file on dedup()
+
 import re, random
 optRe = re.compile(r'({\d})')
 
@@ -45,6 +47,15 @@ class PosNegRecord(dbi.Record):
         'pattern',        # the string to apply
         'number',         # number of people this string is for
         ]
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.pn == other.pn and self.pattern == other.pattern
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     pass
 
 def en_join(args):
@@ -70,6 +81,7 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         return
 
     def makeDb(self, filename):
+        self._posneg_filename = filename
         return dbi.DB(filename, Record=PosNegRecord)
 
     def stats(self, irc, msg, args, channel):
@@ -80,11 +92,13 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         np = nm = 0
         maxn = 0
         for rec in db:
+            print '#%03d %s %s' % (rec.id,rec.pn,rec.pattern)
             if rec.pn == '+': np += 1
             if rec.pn == '-': nm += 1
             if rec.number > maxn: maxn = rec.number
-        irc.reply('I have %d positive and %d negative reinforcements for up to %d things' \
-                      % (np, nm, maxn))
+        irc.reply('I have %d positive and %d negative reinforcements'
+                  ' for up to %d things' % (np, nm, maxn))
+        print 'In file: %s' % self._posneg_filename
         return
     stats = wrap(stats, ['channel'])
             
@@ -166,6 +180,51 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         return
     add = wrap(add, ['channel', ('literal', ('+','-')), many('something')])
 
+    def remove(self, irc, msg, args, channel, ident):
+        '''[<channel] <ident>
+
+        Remove reinforcement #<ident> from <channel>.'''
+        db = self.getDb(channel)
+        rec = db.get(ident)
+        if not rec:
+            irc.reply('No reinforcement #%d in channel %s' % (ident,channel))
+            return
+        db.remove(ident)
+        irc.reply('Removed reinforcement #%d from channel %s' % (ident,channel))
+        return
+    remove = wrap(remove, ['channel','int'])
+
+    def dedup(self, irc, msg, args, channel):
+        '''[<channel>]
+
+        Remove any duplicates'''
+        db = self.getDb(channel)
+        allrecs = [(r.pn,r.pattern,r.number) for r in db]
+        recs = set(allrecs)
+        if len(allrecs) == len(recs):
+            irc.reply('No deduplication needed in %s' % channel)
+            return
+        db.flush()
+        db.close()
+        del (db)
+        del (self.dbCache[channel])
+
+        fname = self.makeFilename(channel)
+        backup = fname + '.last'
+        if os.path.exists(backup):
+            os.remove(backup)
+        os.rename(fname, backup)
+
+        db = self.getDb(channel) # makes new one
+        for r in recs:
+            rec = PosNegRecord(pn=r[0], pattern=r[1], number=r[2])
+            db.add(rec)
+
+        irc.reply('deduplicated from %s to %s reinforcements' % \
+                      (len(allrecs),len(recs)))
+        return
+    dedup = wrap(dedup, ['channel'])
+
     # update an id
     def replace(self, irc, msg, args, channel, ident, pn, pattern):
         """[<channel>] <ID#> [+/-] <pattern>
@@ -189,6 +248,68 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
     replace = wrap(replace, ['channel', 'int', 
                              optional(('literal', ('+','-'))),
                              many('something')])
+
+    def show(self, irc, msg, args, channel, ident):
+        '''[<channel>] ID#
+
+        show what entry at ID# is.'''
+        db = self.getDb(channel)
+        rec = db.get(ident)
+        if not rec:
+            irc.reply('No reinforcement #%d' % ident)
+            return
+        irc.reply('in %s #%d\'s "%s" reinforcement is "%s"' % \
+                      (channel, ident, rec.pn, rec.pattern))
+        return
+    show = wrap(show,['channel','int'])
+
+    def joindb(self, irc, msg, args, fromchannel, tochannel, ident):
+        '''<fromchannel> [<tochannel>] [<fromID#>]
+
+        Join the entire DB from <fromchannel> in to <tochannel>.  
+        If <fromID#> given join just that one entry.
+        '''
+        print 'joindb("%s","%s",%s)' % (fromchannel, tochannel, ident)
+
+        from_db = self.getDb(fromchannel)
+        to_db = self.getDb(tochannel)
+
+        added = []
+        def add_if_new(rec):
+            for has in to_db:
+                if rec == has:
+                    print 'Already have record in %s at #%d: %s' % \
+                        (fromchannel, has.id, has.pattern)
+                    return
+                continue
+            newident = to_db.add(rec)
+            print 'Adding record from %s at #%d: %s' % \
+                (fromchannel, newident, rec.pattern)
+            added.append(newident)
+            return newident
+
+        if ident is None:
+            for from_rec in from_db:
+                newid = add_if_new(from_rec)
+        else:
+            from_rec = from_db.get(ident)
+            if from_rec:
+                add_if_new(from_rec)
+        if added:
+            irc.reply('Added %d entries from %s into %s: [%s]' % \
+                          (len(added), fromchannel, tochannel,
+                           '], ['.join(map(str,added))))
+        else:
+            irc.reply('No entries in %s to add into %s' % \
+                          (fromchannel,tochannel))
+        return
+    joindb = wrap(joindb, ['channel','channel',optional('int')])
+
+# ~joindb #stopdrinking 2    
+# #stopdrinking #sobrietibot 2
+
+# ~joindb #sobrietibot #stopdrinking 2    
+#sobrietibot #stopdrinking 2
 
     pass
 
