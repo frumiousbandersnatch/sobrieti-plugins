@@ -38,6 +38,7 @@ ud_api_base_url = \
     'http://api.urbandictionary.com/v0/define?'
 
 import urllib, urllib2, json
+import re
 
 def udquery(term, page=1):
     print 'URBAN: looking up term="%s", page=%d' % (term,page)
@@ -55,7 +56,8 @@ def format_result(res, number, pat):
     defi['result_type'] = res['result_type']
     defi['has_related_words'] = res['has_related_words']
 
-    return pat % defi
+    res = pat % defi
+    return re.sub('\s+',' ',res)
 
 class Urban(callbacks.Plugin):
     """Lookup hip Internet terms"""
