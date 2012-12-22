@@ -361,6 +361,43 @@ class Snoo(callbacks.Plugin):
                        optional('int',10),
                        optional('int',5)])
 
+    def mods(self, irc, msg, args, subname):
+        '''[<subreddit>]
+
+        Print the mods for the given or defalt sub-reddit'''
+    
+        if not subname:
+            subname = self.registryValue('subreddit')
+        sub = self.get_sub(subname, irc)
+        if not sub: return
+
+        moditr = sub.get_moderators()
+        names = ', '.join([m.name for m in moditr])
+        irc.reply('mods for r/%s are: %s' % (subname, names))
+
+        return
+    mods = wrap(mods, [optional('something')])
+
+    def fip(self, irc, msg, args, name):
+        '''[<name>]
+
+        Print the fake Internet points that <name> has garnered on reddit.'''
+
+        if not name:
+            name = msg.nick
+        red = self.get_redditor(name)
+        pname = name
+        if name != red.name:
+            pname = '%s (as %s)' % (name, red.name)
+        if not red:
+            irc.reply('failed to find %s on reddit' % pname)
+            return
+
+        irc.reply('fake Internet points for %s: %d (links) and %d (comments)' % \
+                      (pname, red.link_karma, red.comment_karma))
+        return
+    fip = wrap(fip, [optional('something')])
+        
 Class = Snoo
 
 
