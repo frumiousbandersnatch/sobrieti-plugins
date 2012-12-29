@@ -98,7 +98,6 @@ class Surveyor(object):
                 self.score += a[0]
 
             self.answers.append(answer)
-        print 'SURVEY', self.score, self.answers
 
         self.current += 1        
         if self.current >= len(self.survey.questions):
@@ -160,7 +159,6 @@ class Survey(callbacks.Plugin):
 
     def _find(self, pat):
         found = []
-        print 'SURVEY check pattern:', pat, self._surveys
         for s in self._surveys.values():
             if re.search(pat, s.title, flags=re.I):
                 found.append(s)
@@ -172,7 +170,6 @@ class Survey(callbacks.Plugin):
         if not self._surveys:
             irc.reply('No surveys known')
             return
-        print 'SURVEYS:',str(self._surveys)
         slist = ', '.join(['"%s"'%s.title for s in self._surveys.values()])
         irc.reply('I can administer these surveys: %s' % slist)
         return
