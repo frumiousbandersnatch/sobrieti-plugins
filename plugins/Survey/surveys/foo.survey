@@ -1,0 +1,35 @@
+# -*- python -*-
+
+{
+    'title': 'Troll',
+    'desc': "Monty Python and the Holy Grail's Troll",
+    
+    'questions': [
+        {
+            'q':'What is your name?',
+            'a':[]
+            },
+        {
+            'q':'What is your quest?',
+            'a':[
+                (1,'I seek the Holy Grail'),
+                (0,'I seek the Tiny Elf'),
+                (0,'Ions.'),
+                ],
+            },
+        {
+            'q':'What is your favorite color?',
+            'a':[
+                (1,'red'),
+                (0,'blue'),
+                (0,'green'),
+                ],
+            },
+        {
+            'q':'What is the average airspeed velocity of an unlaiden swallow?',
+            'a':[
+                (100,'African or European?'),
+                ],
+            }
+        ]
+}
