@@ -313,7 +313,7 @@ class Snoo(callbacks.Plugin):
     def coin(self, irc, msg, args, name):
         """[<name>]"
 
-        Show you or another's flair from the default subreddit.  See
+        Show your or another's flair from the default subreddit.  See
         the flair command for a more general command.
         """
         if not name:
