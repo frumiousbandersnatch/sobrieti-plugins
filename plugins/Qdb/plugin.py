@@ -79,7 +79,7 @@ def format_quote(data, maxlen = 400):
     maybe = '#%s(%s): [%s] %s' % (n,s,u,q)
     if len(maybe) < maxlen:
         return maybe
-    return '#%s(%s): [%s] (long quote, see web page)' % (n,s,u)
+    return '#%s(%s): [ %s ] (long quote, see web page)' % (n,s,u)
         
 class Qdb(callbacks.Plugin):
     """Add the help for "@plugin help Qdb" here
