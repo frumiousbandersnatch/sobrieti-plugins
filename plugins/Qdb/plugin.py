@@ -68,7 +68,7 @@ def format_quote_list(data):
     ids = ', '.join(['[%s]'%d['id'] for d in data])
     return 'quotes: %s' % ids
 
-def format_quote(data, maxlen = 400):
+def format_quote(data, maxlen = 1000):
     q = data['quote']
     q = q.replace('&lt;','<').replace('&gt;','>').replace('\r\n',' | ')
     q = q.replace('&quot;','"')
