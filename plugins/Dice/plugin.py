@@ -62,13 +62,27 @@ class Dice(callbacks.Plugin):
     def ask(self, irc, msg, args, stuff):
         """Ask a yes or no question or a 'this or that or the other'"""
         if 'or' in stuff:
-            stuff = ' '.join(stuff).split('or')
+            stuff = ' '.join(stuff).split(' or ')
             res = random.choice(stuff).strip().encode('utf-8')
         else:
             res = random.choice(['yes', 'no'])
 
         irc.reply(res)
     ask = wrap(ask, [many('something')])
+
+    def rand(self, irc, msg, args, num1, num2):
+        numbers = []
+        if num1 is not None:
+            numbers.append(num1)
+        if num2 is not None:
+            numbers.append(num2)            
+        a = min(numbers)
+        b = max(numbers)
+
+        r = random.randint(a,b)
+        irc.reply('%d' % r)
+        return
+    rand = wrap(rand, ['int', optional('int',None)])
 
     pass
 
