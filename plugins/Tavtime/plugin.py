@@ -66,11 +66,12 @@ class Tavtime(callbacks.Plugin):
     def tavtime(self, irc, msg, args):
         seconds = int(time.time())
         quadraels, extraraels, subraels, remainder = yi_olde_timey(seconds)
-        irc.reply('%s  -  It is now %d:%d:%d:%d  -  %s' % \
-                      (unichr(8987),
-                       quadraels, extraraels, subraels, remainder, 
-                       unichr(8986)), 
-                  prefixNick=False)
+        rep = '%s  -  It is now %d:%d:%d:%d  -  %s' % \
+            (unichr(8987),
+             quadraels, extraraels, subraels, remainder, 
+             unichr(8986))
+        rep = rep.encode('utf-8')
+        irc.reply(rep, prefixNick=False)
         return
 
     pass

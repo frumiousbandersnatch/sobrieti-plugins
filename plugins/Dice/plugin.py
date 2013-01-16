@@ -36,6 +36,7 @@ import supybot.callbacks as callbacks
 
 
 import random
+random.seed()
 
 class Dice(callbacks.Plugin):
     """Roll dice and display the results."""
@@ -76,6 +77,8 @@ class Dice(callbacks.Plugin):
             numbers.append(num1)
         if num2 is not None:
             numbers.append(num2)            
+        if len(numbers) == 1:
+            numbers.append(0)
         a = min(numbers)
         b = max(numbers)
 
