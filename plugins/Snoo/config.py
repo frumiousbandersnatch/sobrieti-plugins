@@ -45,9 +45,18 @@ Snoo = conf.registerPlugin('Snoo')
 # conf.registerGlobalValue(Snoo, 'someConfigVariableName',
 #     registry.Boolean(False, """Help for someConfigVariableName."""))
 
+conf.registerGlobalValue(Snoo, 'rSlashLinks',
+                         registry.Boolean(False, """Set to true if you want r/subname echoed as links."""))
+
 conf.registerGlobalValue(Snoo, 'subreddit',
      registry.String('stopdrinking', """The subreddit to which the bot 
      is associated.  Will be used by default if not otherwise specified."""))
+
+conf.registerChannelValue(Snoo, 'rIgnoredSubs',
+    registry.SpaceSeparatedListOfStrings([],"""Subreddits to ignore when snarfing r/ links"""))
+
+conf.registerChannelValue(Snoo, 'rSlashLinkMap',
+    registry.SpaceSeparatedListOfStrings([],"""Map of names to replace like Alias:Real."""))
 
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:

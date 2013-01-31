@@ -28,14 +28,18 @@
 
 ###
 
+import re
+
+import supybot.conf as conf
 import supybot.utils as utils
 import supybot.ircdb as ircdb
+import supybot.world as world
 from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 
-
+from urllib2 import HTTPError
 import praw
 myurl = 'https://github.com/frumiousbandersnatch/sobrieti-plugins'
 reddit = praw.Reddit('sobrieti IRC bot for r/stopdrinking. %s' % myurl)
@@ -51,7 +55,7 @@ def awkwardly_pick_rs(name1, name2, defred, defsub):
         return (name1,name2)
 
     if name1:
-        if name1.startswith('r/'):
+        if isinstance(name1, str) and name1.startswith('r/'):
             name1 = name1[2:]
             return (defred, name1)
         return (name1, defsub)
@@ -141,6 +145,35 @@ def poetry(red, nwords, nskip):
 rank_types = ['hot','new','top','controversial']
 rank_terms = ['week','month','year']
 
+class RedditorDB(plugins.ChannelUserDB):
+    def serialize(self, v):
+        return [v]
+
+    def deserialize(self, channel, id, L):
+        if len(L) != 1:
+            raise ValueError
+        return L[0]
+
+redditors_filename = conf.supybot.directories.data.dirize('Redditors.db')
+
+# fixme: make configurable
+ignore_r_snarf = []
+
+import supybot.utils as utils
+def subs2links(subs):
+    urls = []
+    for sub in subs:
+        tryurl = 'http://reddit.com/' + sub
+        try:
+            fp = utils.web.getUrlFd(tryurl)
+        except utils.web.Error:
+            continue
+        if '/search?q=' not in fp.geturl():
+            urls.append(tryurl)
+        continue
+    return ' '.join(['<%s>' % url for url in urls])
+
+
 class Snoo(callbacks.Plugin):
     """Interact with reddit"""
     threaded = True
@@ -150,6 +183,67 @@ class Snoo(callbacks.Plugin):
         self.__parent = super(Snoo, self)
         self.__parent.__init__(irc)
         self.subcache = {}
+        self.db = RedditorDB(redditors_filename)
+        world.flushers.append(self.db.flush)
+        return
+
+    def die(self):
+        if self.db.flush in world.flushers:
+            world.flushers.remove(self.db.flush)
+        self.db.close()
+        self.__parent.die()
+
+    def doPrivmsg(self, irc, msg):
+        if not self.registryValue('rSlashLinks'):
+            return
+
+        ignored_subs = self.registryValue('rIgnoredSubs')
+        rslmap = dict()
+        for pair in self.registryValue('rSlashLinkMap'):
+            k,v = pair.split(':')
+            rslmap[k.lower()] = v
+
+        subs = []
+
+        for word in msg.args[1].split():
+            if not word: 
+                continue
+            parts = word.split('r/')
+            if len(parts) != 2: 
+                continue
+            if parts[0] != '':
+                continue
+            sub = parts[1]
+            if sub in ignore_r_snarf:
+                continue
+            sub = rslmap.get(sub.lower(),sub)
+            subs.append('r/' + sub)
+
+        # cut-and-paste programmers suck
+
+        for word in msg.args[1].split():
+            if not word: 
+                continue
+            parts = word.split('u/')
+            if len(parts) != 2: 
+                continue
+            if parts[0] != '':
+                continue
+            sub = parts[1]
+            if sub in ignore_r_snarf:
+                continue
+            sub = rslmap.get(sub.lower(),sub)
+            subs.append('u/' + sub)
+
+        if not subs:
+            return
+
+        sublinks = subs2links(subs)
+        if not sublinks:
+            #irc.reply('No real reddit links', prefixNick=False)
+            return
+        irc.reply('Reddit links: %s' % sublinks, prefixNick=False)
+        return
 
     def get_sub(self, name, irc = None):
         if not name:
@@ -166,12 +260,12 @@ class Snoo(callbacks.Plugin):
             return 
 
         try:
-            cid = sub.content_id    # trigger error
+            cid = sub.id    # trigger error if sub d.n.e.
         except ValueError:
             if irc:
                 irc.reply('r/%s does not appear to exist' % name)
             return
-        except praw.HTTPError:
+        except HTTPError:
             if irc:
                 irc.reply('failed to load r/%s' % name)
             return
@@ -249,115 +343,131 @@ class Snoo(callbacks.Plugin):
     stats = subscribers
 
 
-    def get_assoc_redditors(self, nick):
-        """Try to return the redditors associated with the nick."""
-
+    def _get_redname(self, channel, user_or_nick):
+        '''
+        Return the redditor name that is associated to the user_or_nick.
+        '''
+        fallback = user_or_nick
+        uid = user_or_nick
+        if isinstance(user_or_nick, ircdb.IrcUser):
+            fallback = user_or_nick.name
+            uid = user_or_nick.id
+        self.log.debug('Snoo._get_redname: UID=%s' % uid)
         try:
-            user = ircdb.users.getUser(nick)
+            name = self.db[channel, uid]
         except KeyError:
-            return []
+            return fallback
+        return name or fallback
 
-        if not user:
-            if irc:
-                irc.reply('No associated redditor with: "%s"' % nick)
-            return []
-
-        ret = []
-        for assoc in user.associations:
-            try:
-                name, domain = assoc.split('|')
-            except ValueError:
-                continue
-            if domain != 'reddit':
-                continue
-            ret.append(name)
-        return ret
+    def redditor(self, irc, msg, args, channel, user, name):
+        '''[<channel>] RedditName
         
-    def _real_flair(self, irc, msg, args, name1, name2):
-        """[<redditor> and/or r/<subreddit>]
+        Associate your reddit name with your IRC identity (use name
+        "delete" to disassociation).  This will associate to your
+        current nick or your bot ID if you are registered with the
+        bot (see help register).'''
+        uid = msg.nick
+        if user:
+            uid = user.id
+        
+        if name.lower() in ['', 'none','rm','remove','delete']:
+            try:
+                self.db[channel, uid] = ''
+            except KeyError:
+                pass
+            irc.reply('You are not associated with any redditor.')
+            return
+        self.db[channel, uid] = name
+            
+        irc.reply('I associate you with redditor "%s" in %s (using: id %s)' %\
+                      (name, channel, uid))
+        return
+    redditor = wrap(redditor, ['channel', optional('user'), 'something'])
+
+    def whoami(self, irc, msg, args, channel, user):
+        '''[<channel>]
+        
+        Show your the reddit name associated with your bot user or nick.
+        '''
+        name = self._get_redname(channel, user or msg.nick)
+        irc.reply('I think you are redditor "%s" in %s' % (name, channel))
+        return
+    whoami = wrap(whoami, ['channel', optional('user')])
+
+    def whois(self, irc, msg, args, channel, user_or_nick):
+        '''[<channel>] <user|nick>
+        See who the redditor is
+        '''
+        name = self._get_redname(channel, user_or_nick)
+        irc.reply('I think it is redditor "%s" in %s' % (name, channel))
+        return
+    whois = wrap(whois, ['channel', first('otherUser','nick')])
+
+    def _get_flair_text(self, redname, sub):
+        f = sub.get_flair(redname)
+        if not f['flair_text']:
+            return
+        if f['user'] != redname:
+            return
+        return f['flair_text']
+
+    def _reply_with_flair(self, irc, name, flair, sub):
+        irc.reply('%s has %s with %s' % (name, flair, sub),
+                  prefixNick=False)
+        return
+
+    def _real_flair(self, irc, msg, args, channel, thing1, thing2):
+        """[<chanel>] [<name> and/or r/<subreddit>]
 
         Show some flair.
         """
-        defnick = msg.nick 
-        defsub = self.registryValue('subreddit')
-
-        red, subname = awkwardly_pick_rs(name1,name2, defnick, defsub)
+        defnick = msg.nick
+        defsub = self.registryValue('subreddit')        
+        name, subname = awkwardly_pick_rs(thing1,thing2, defnick, defsub)
+        redname = self._get_redname(channel, name)
 
         sub = self.get_sub(subname, irc)
         if not sub: return 
 
-        f = sub.get_flair(red)
-
-        if f['flair_text']:
-            irc.reply('%s has %s with %s' % \
-                          (red, f['flair_text'], sub.display_name),
-                      prefixNick=False)
+        ft = self._get_flair_text(redname, sub)
+        if ft:
+            self._reply_with_flair(irc, redname, ft, sub.display_name)
             return
 
-        # try again with an association
-        for name in self.get_assoc_redditors(red):
-            f = sub.get_flair(name)
-            if not f['flair_text']:
-                continue
-
-            irc.reply('%s (as %s) has %s with %s' % \
-                          (red, name, f['flair_text'], sub.display_name),
-                      prefixNick=False)
-            return
-
-        irc.reply('%s has no flair in %s and that is okay.' % \
-                      (red,sub.display_name))
+        irc.reply('%s has no flair in %s or has a different reddit name and that is okay.' % (redname,sub.display_name))
         return
-    flair = wrap(_real_flair, [optional('something'), optional('something')])
+    flair = wrap(_real_flair, ['channel', optional(first('otherUser','something')), optional('something')])
 
-    def coin(self, irc, msg, args, name):
-        """[<name>]"
+    def coin(self, irc, msg, args, channel, name):
+        """[<channel>] [<user|nick>]"
 
         Show your or another's flair from the default subreddit.  See
         the flair command for a more general command.
         """
-        if not name:
-            name = msg.nick
         subname = self.registryValue('subreddit')
-        self._real_flair(irc, msg, args, name, subname)
+        self._real_flair(irc, msg, args, channel, name, subname)
         return
-    coin = wrap(coin, [optional("something")])
+    coin = wrap(coin, ['channel', optional(first('otherUser','something'))] )
 
-    def get_redditor(self, name):
-        """Try to return reddtor object."""
-        maybe = [name]
-        assoc = self.get_assoc_redditors(name)
-        if assoc:
-            maybe = assoc
-
-        for name in maybe:
-            try:
-                red = reddit.get_redditor(name)
-            except praw.HTTPError:
-                continue
-            else:
-                return red
-        return 
-
-    def poem(self, irc, msg, args, name, nwords, nskip):
+    def poem(self, irc, msg, args, channel, name, nwords, nskip):
         """<name> [<nwords> [<nskip>]]
 
         Generate a poem based on recent reddit comments by <name>.
         Optionally specify how many <nwords> to generate and how many
         words to <nskip> in the corpus.
         """
-        if not name:
-            name = msg.nick
-        red = self.get_redditor(name)
+        redname = self._get_redname(channel, name)
+        red = reddit.get_redditor(redname)
         if not red:
-            irc.reply('failed to find "%s" on reddit' % name)
+            irc.reply('I can not find any redditor by that name')
             return
 
         msg = poetry(red, nwords, nskip)
-        irc.reply('<%s> %s' % (name, msg), prefixNick=False)
+        irc.reply('<%s> %s' % (redname, msg), prefixNick=False)
         return
 
-    poem = wrap(poem, ['something',
+    poem = wrap(poem, ['channel',
+                       first('otherUser','something'),
                        optional('int',10),
                        optional('int',5)])
 
@@ -382,21 +492,17 @@ class Snoo(callbacks.Plugin):
         '''[<name>]
 
         Print the fake Internet points that <name> has garnered on reddit.'''
-
-        if not name:
-            name = msg.nick
-        red = self.get_redditor(name)
-        pname = name
-        if name != red.name:
-            pname = '%s (as %s)' % (name, red.name)
+        redname = self.get_reddit_name(channel, msg, name)
+        red = reddit.get_redditor(redname)
         if not red:
-            irc.reply('failed to find %s on reddit' % pname)
+            irc.reply('I can not find any redditor by that name')
             return
 
-        irc.reply('fake Internet points for %s: %d (links) and %d (comments)' % \
-                      (pname, red.link_karma, red.comment_karma))
+        irc.reply('fake Internet points for %s: %d (links) / %d (comments)' % \
+                      (redname, red.link_karma, red.comment_karma))
+
         return
-    fip = wrap(fip, [optional('something')])
+    fip = wrap(fip, [optional(first('otherUser','something'))])
         
 Class = Snoo
 
