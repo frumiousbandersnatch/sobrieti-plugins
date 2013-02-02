@@ -211,7 +211,7 @@ class Snoo(callbacks.Plugin):
             parts = word.split('r/')
             if len(parts) != 2: 
                 continue
-            if parts[0] != '':
+            if parts[0] not in ['','/']:
                 continue
             sub = parts[1]
             if sub in ignore_r_snarf:
@@ -227,7 +227,7 @@ class Snoo(callbacks.Plugin):
             parts = word.split('u/')
             if len(parts) != 2: 
                 continue
-            if parts[0] != '':
+            if parts[0] not in ['','/']:
                 continue
             sub = parts[1]
             if sub in ignore_r_snarf:
