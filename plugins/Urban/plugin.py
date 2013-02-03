@@ -51,8 +51,8 @@ def udquery(term, page=1):
 def format_result(res, number, pat):
     defi = dict(res['list'][number-1])
     defi['number'] = number
-    defi['total'] = res['total']
-    defi['pages'] = res['pages']
+    defi['total'] = res.get('total',len(res))
+    defi['pages'] = res.get('pages',0)
     defi['result_type'] = res['result_type']
     defi['has_related_words'] = res['has_related_words']
 
