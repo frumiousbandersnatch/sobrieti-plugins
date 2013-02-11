@@ -294,7 +294,7 @@ class Snoo(callbacks.Plugin):
         methname = 'sub.get_%s%s' % (type,_term_)
         meth = eval(methname)
 
-        lst = meth(1)
+        lst = meth(limit=1)
         try:
             lst = [x for x in lst]
         except ValueError,err:
@@ -456,7 +456,7 @@ class Snoo(callbacks.Plugin):
         Optionally specify how many <nwords> to generate and how many
         words to <nskip> in the corpus.
         """
-        redname = self._get_redname(channel, name)
+        redname = self._get_redname(channel, name or msg.nick)
         red = reddit.get_redditor(redname)
         if not red:
             irc.reply('I can not find any redditor by that name')
@@ -467,7 +467,7 @@ class Snoo(callbacks.Plugin):
         return
 
     poem = wrap(poem, ['channel',
-                       first('otherUser','something'),
+                       optional(first('otherUser','something')),
                        optional('int',10),
                        optional('int',5)])
 
@@ -488,11 +488,11 @@ class Snoo(callbacks.Plugin):
         return
     mods = wrap(mods, [optional('something')])
 
-    def fip(self, irc, msg, args, name):
+    def fip(self, irc, msg, args, channel, name):
         '''[<name>]
 
         Print the fake Internet points that <name> has garnered on reddit.'''
-        redname = self.get_reddit_name(channel, msg, name)
+        redname = self._get_redname(channel, name or msg.nick)
         red = reddit.get_redditor(redname)
         if not red:
             irc.reply('I can not find any redditor by that name')
@@ -502,7 +502,7 @@ class Snoo(callbacks.Plugin):
                       (redname, red.link_karma, red.comment_karma))
 
         return
-    fip = wrap(fip, [optional(first('otherUser','something'))])
+    fip = wrap(fip, ['channel', optional(first('otherUser','something'))])
         
 Class = Snoo
 
