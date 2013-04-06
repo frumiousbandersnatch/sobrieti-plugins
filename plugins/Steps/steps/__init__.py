@@ -7,7 +7,7 @@ the file to the import and __all__ lists.
 
 """
 
-import aa, af, ag, ape, at, bot, bud, precepts, ft, fucked, trad
+import aa, af, ag, ape, at, bot, bud, precepts, ft, fucked, trad, gig
 __all__ = ['aa', 'af', 'ag', 'ape', 'at', 'bot', 'bud', 
-           'precepts', 'ft', 'fucked', 'trad']
+           'precepts', 'ft', 'fucked', 'trad', 'gig']
 

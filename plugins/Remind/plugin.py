@@ -63,7 +63,7 @@ class Remind(callbacks.Plugin):
         elif s == 'h' or s == 'hr' or s == 'hrs' or s == 'hour' or s == 'hours':
             return 3600 # seconds = 1 hour
         elif s == 'd' or s == 'day' or s == 'days':
-            return 36400 # seconds = 1 day
+            return 86400 # seconds = 1 day
         elif s == 'w' or s == 'wk' or s == 'wks' or s == 'week' or s == 'weeks':
             return 604800 # seconds = 1 week
         elif s == 'f' or s == 'fn' or s == 'fns' or s == 'fortnight' or s == 'fortnights':

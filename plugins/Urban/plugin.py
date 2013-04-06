@@ -51,7 +51,7 @@ def udquery(term, page=1):
 def format_result(res, number, pat):
     defi = dict(res['list'][number-1])
     defi['number'] = number
-    defi['total'] = res.get('total',len(res))
+    defi['total'] = res.get('total',len(res['list']))
     defi['pages'] = res.get('pages',0)
     defi['result_type'] = res['result_type']
     defi['has_related_words'] = res['has_related_words']
@@ -74,10 +74,10 @@ class Urban(callbacks.Plugin):
         try:
             return self.cache[key]
         except KeyError:
-            res = udquery(term,page)
-            self.cache[key] = res
-            return res
-        return
+            pass
+        res = udquery(term,page)
+        self.cache[key] = res
+        return res
 
     def ud(self, irc, msg, args, number, term):
         term = ' '.join(term)
@@ -85,9 +85,16 @@ class Urban(callbacks.Plugin):
 
         pattern = self.registryValue('resultFormat')
 
-        res = self._get(term,page)
+        try:
+            res = self._get(term,page)
+        except Exception, err:
+            irc.reply('Sorry, urbandictionary is to hip to answer us (%s)' % err)
         res_type = res['result_type']
         nres = len(res['list'])
+
+        #self.log.debug('%d results:' % nres)
+        #for one in res['list']:
+        #    self.log.debug(str(one))
 
         if res_type == 'no_results':
             irc.reply('No hip definition for "%s"' % term)

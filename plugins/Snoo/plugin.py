@@ -39,7 +39,7 @@ import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 
-from urllib2 import HTTPError
+from requests.exceptions import HTTPError
 import praw
 myurl = 'https://github.com/frumiousbandersnatch/sobrieti-plugins'
 reddit = praw.Reddit('sobrieti IRC bot for r/stopdrinking. %s' % myurl)
@@ -457,7 +457,11 @@ class Snoo(callbacks.Plugin):
         words to <nskip> in the corpus.
         """
         redname = self._get_redname(channel, name or msg.nick)
-        red = reddit.get_redditor(redname)
+        try:
+            red = reddit.get_redditor(redname)
+        except HTTPError:
+            red = None
+        
         if not red:
             irc.reply('I can not find any redditor by that name')
             return
@@ -493,7 +497,11 @@ class Snoo(callbacks.Plugin):
 
         Print the fake Internet points that <name> has garnered on reddit.'''
         redname = self._get_redname(channel, name or msg.nick)
-        red = reddit.get_redditor(redname)
+        try:
+            red = reddit.get_redditor(redname)
+        except HTTPError:
+            red = None
+
         if not red:
             irc.reply('I can not find any redditor by that name')
             return
