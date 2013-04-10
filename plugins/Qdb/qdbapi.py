@@ -10,7 +10,8 @@ import cgi
 from urllib import urlencode
 from urllib2 import urlopen, HTTPError
 
-rashurl = 'http://stop.zzl.org/qdb'
+rashurl = 'http://sobrieti.bot.nu/rqdb'
+#rashurl = 'http://stop.zzl.org/qdb'
 #rashurl = 'http://192.168.1.129/rqdb'
 apiurl = rashurl + '/api.php'
 
