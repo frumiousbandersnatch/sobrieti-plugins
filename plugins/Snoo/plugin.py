@@ -171,7 +171,7 @@ def subs2links(subs):
         if '/search?q=' not in fp.geturl():
             urls.append(tryurl)
         continue
-    return ' '.join(['<%s>' % url for url in urls])
+    return ' '.join(['< %s >' % url for url in urls])
 
 
 class Snoo(callbacks.Plugin):
@@ -313,7 +313,7 @@ class Snoo(callbacks.Plugin):
 
         score = '(+%d/-%d)' % (first.ups, first.downs)
 
-        msg = '%s in r/%s %s: "%s" by %s%s <http://redd.it/%s>' % \
+        msg = '%s in r/%s %s: "%s" by %s%s < http://redd.it/%s >' % \
             (rankstr.capitalize(), sub.display_name, score,
              first.title, first.author, flair, first.id)
         irc.reply(msg, prefixNick=False)
