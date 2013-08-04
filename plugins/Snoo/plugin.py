@@ -405,6 +405,8 @@ class Snoo(callbacks.Plugin):
 
     def _get_flair_text(self, redname, sub):
         f = sub.get_flair(redname)
+        if not f:
+            return
         if not f['flair_text']:
             return
         if f['user'] != redname:
