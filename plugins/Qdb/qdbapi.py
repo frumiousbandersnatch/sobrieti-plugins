@@ -42,7 +42,7 @@ def format_quote_list(data):
     ids = ', '.join(['[%s]'%d['id'] for d in data])
     return 'quotes: %s' % ids
 
-def format_quote(data, maxlen = 1000):
+def format_quote(data, maxlen = None):
     '''
     Format the data returned from an API get into a single line.
 
@@ -56,7 +56,7 @@ def format_quote(data, maxlen = 1000):
     s = data['rating']
     u = '%s/?%s' % (rashurl, n)
     maybe = '#%s(%s): [%s] %s' % (n,s,u,q)
-    if len(maybe) < maxlen:
+    if maxlen is None or len(maybe) < maxlen:
         return maybe
     return '#%s(%s): [ %s ] (long quote, see web page)' % (n,s,u)
         
