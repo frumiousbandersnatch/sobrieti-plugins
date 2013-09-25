@@ -63,6 +63,7 @@ class Yow(callbacks.Plugin):
                 if line == '\x00':
                     in_header = False
     def yow(self, irc, msg, args):
+        'Simulate Zippy the pinhead'
         yl = random.choice(self.yow_lines)
         irc.reply(yl, prefixNick=False)
     yow = wrap(yow)
