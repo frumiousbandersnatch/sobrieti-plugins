@@ -72,6 +72,10 @@ class Dice(callbacks.Plugin):
     ask = wrap(ask, [many('something')])
 
     def rand(self, irc, msg, args, num1, num2):
+        '''[num1 [num2]]
+
+        Pick random numbers.
+        '''
         numbers = []
         if num1 is not None:
             numbers.append(num1)
