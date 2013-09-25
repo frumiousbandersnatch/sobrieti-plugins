@@ -54,7 +54,6 @@ def format_result(res, number, pat):
     defi['total'] = res.get('total',len(res['list']))
     defi['pages'] = res.get('pages',0)
     defi['result_type'] = res['result_type']
-    defi['has_related_words'] = res['has_related_words']
 
     res = pat % defi
     return re.sub('\s+',' ',res)
@@ -80,6 +79,9 @@ class Urban(callbacks.Plugin):
         return res
 
     def ud(self, irc, msg, args, number, term):
+        '''[term]
+
+        Look up <term> on Urban Dictionary.'''
         term = ' '.join(term)
         page = 1                # hard code for now
 
