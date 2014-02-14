@@ -41,6 +41,9 @@ import supybot.callbacks as callbacks
 
 from requests.exceptions import HTTPError
 import praw
+from . import localflair
+reload(localflair)
+
 myurl = 'https://github.com/frumiousbandersnatch/sobrieti-plugins'
 reddit = praw.Reddit('sobrieti IRC bot for r/stopdrinking. %s' % myurl)
 
@@ -184,6 +187,7 @@ class Snoo(callbacks.Plugin):
         self.__parent.__init__(irc)
         self.subcache = {}
         self.db = RedditorDB(redditors_filename)
+        self._local_flair_subs = dict()
         world.flushers.append(self.db.flush)
         return
 
@@ -423,6 +427,7 @@ class Snoo(callbacks.Plugin):
 
         Show some flair.
         """
+        # reddit now requires mod access to grab flair like this
         defnick = msg.nick
         defsub = self.registryValue('subreddit')        
         name, subname = awkwardly_pick_rs(thing1,thing2, defnick, defsub)
@@ -438,7 +443,42 @@ class Snoo(callbacks.Plugin):
 
         irc.reply('%s has no flair in %s or has a different reddit name and that is okay.' % (redname,sub.display_name))
         return
-    flair = wrap(_real_flair, ['channel', optional(first('otherUser','something')), optional('something')])
+    #flair = wrap(_real_flair, ['channel', optional(first('otherUser','something')), optional('something')])
+
+    def _local_flair_obj(self, subname):
+        try:
+            return self._local_flair_subs[subname]
+        except KeyError:
+            pass
+        lf = localflair.Flair(subname)
+        self._local_flair_subs[subname] = lf
+        return lf
+
+    def _local_flair(self, irc, msg, args, channel, thing1, thing2):
+        """[<chanel>] [<name> and/or r/<subreddit>]
+
+        Show some flair.
+        """
+        defnick = msg.nick
+        defsub = self.registryValue('subreddit')        
+        name, subname = awkwardly_pick_rs(thing1,thing2, defnick, defsub)
+        redname = self._get_redname(channel, name)
+
+        try:
+            flair = self._local_flair_obj(subname)
+        except OSError:
+            irc.reply("I don't have any flair for %s." % (subname))
+            return
+
+        try:
+            days = flair[redname]
+        except KeyError:
+            irc.reply('%s has no flair in %s or has a different reddit name and that is okay.' % (redname,subname))
+            return
+
+        self._reply_with_flair(irc, redname, '%d days' % days, subname)
+        return
+    flair = wrap(_local_flair, ['channel', optional(first('otherUser','something')), optional('something')])
 
     def coin(self, irc, msg, args, channel, name):
         """[<channel>] [<user|nick>]"
@@ -447,7 +487,8 @@ class Snoo(callbacks.Plugin):
         the flair command for a more general command.
         """
         subname = self.registryValue('subreddit')
-        self._real_flair(irc, msg, args, channel, name, subname)
+        #self._real_flair(irc, msg, args, channel, name, subname)
+        self._local_flair(irc, msg, args, channel, name, subname)
         return
     coin = wrap(coin, ['channel', optional(first('otherUser','something'))] )
 
