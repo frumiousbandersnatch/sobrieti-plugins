@@ -16,6 +16,13 @@ def load(subname, timestamp=None, datadir = "$HOME/btsync/flair"):
     #print 'loading',filename
     with open(filename) as fp:
         for line in fp.readlines():
+
+            # skip lines like:
+            # Version 2.1.12 of praw is outdated. Version 2.1.13 was released 51 minutes ago.
+            if line.startswith("Version "):
+                continue
+
+
             redditor, days = line.strip().split(',')
             days = int(days.split()[0])
             dat[redditor] = days
