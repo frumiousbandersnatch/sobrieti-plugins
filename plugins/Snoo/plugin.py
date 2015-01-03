@@ -159,9 +159,6 @@ class RedditorDB(plugins.ChannelUserDB):
 
 redditors_filename = conf.supybot.directories.data.dirize('Redditors.db')
 
-# fixme: make configurable
-ignore_r_snarf = []
-
 import supybot.utils as utils
 def subs2links(subs):
     urls = []
@@ -202,6 +199,14 @@ class Snoo(callbacks.Plugin):
             return
 
         ignored_subs = self.registryValue('rIgnoredSubs')
+        ignore_r_snarf = []
+        for isub in ignored_subs:
+            parts = isub.split('r/')
+            if len(parts) == 1:
+                ignore_r_snarf.append(parts[0])
+            else:
+                ignore_r_snarf.append(parts[1])
+        
         rslmap = dict()
         for pair in self.registryValue('rSlashLinkMap'):
             k,v = pair.split(':')
