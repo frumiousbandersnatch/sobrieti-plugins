@@ -198,6 +198,10 @@ class Snoo(callbacks.Plugin):
         if not self.registryValue('rSlashLinks'):
             return
 
+        ignored_nicks = self.registryValue('rIgnoredNicks')
+        if msg.nick in ignored_nicks:
+            return
+
         ignored_subs = self.registryValue('rIgnoredSubs')
         ignore_r_snarf = []
         for isub in ignored_subs:
