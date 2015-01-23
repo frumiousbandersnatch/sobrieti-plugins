@@ -55,6 +55,9 @@ conf.registerGlobalValue(Snoo, 'subreddit',
 conf.registerChannelValue(Snoo, 'rIgnoredSubs',
     registry.SpaceSeparatedListOfStrings([],"""Subreddits to ignore when snarfing r/ links"""))
 
+conf.registerChannelValue(Snoo, 'rIgnoredNicks',
+    registry.SpaceSeparatedListOfStrings([],"""Nicks to ignore when snarfing r/ links"""))
+
 conf.registerChannelValue(Snoo, 'rSlashLinkMap',
     registry.SpaceSeparatedListOfStrings([],"""Map of names to replace like Alias:Real."""))
 
