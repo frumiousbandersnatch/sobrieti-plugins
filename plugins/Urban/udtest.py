@@ -36,30 +36,3 @@ if '__main__' == __name__:
     print format_result(d,1)
 
 
-example = """
-
-'raevie' returns:
-
-{
-  "has_related_words": false,
-  "list": [
-    {
-      "definition": "To spew large amounts of a bodily fluid, especially male ejaculate. Could also pertain to female ejaculation.",
-      "permalink": "http://raevie.urbanup.com/6744908",
-      "word": "raevie",
-      "author": "AmbivalentFanatic",
-      "current_vote": "",
-      "thumbs_up": 1,
-      "thumbs_down": 0,
-      "defid": 6744908,
-      "example": "\"OMG! Frumious raevied all over his keyboard!\"\n\n\"Yeah, I raevied in her mouth, but the bitch spit it out.\""
-    }
-  ],
-  "result_type": "exact", # or "fulltext" or "no_results"
-  "sounds": [],
-  "total": 1,
-  "pages": 1
-}
-
-
-"""
