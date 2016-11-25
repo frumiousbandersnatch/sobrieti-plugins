@@ -42,9 +42,7 @@ import supybot.callbacks as callbacks
 from requests.exceptions import HTTPError
 import praw
 
-#from flair import get_flair
-import flair as snooflair
-reload(snooflair)
+from flair import get_flair
 
 myurl = 'https://github.com/frumiousbandersnatch/sobrieti-plugins'
 reddit = praw.Reddit('sobrieti IRC bot for r/stopdrinking. %s' % myurl)
@@ -443,7 +441,7 @@ class Snoo(callbacks.Plugin):
         name, subname = awkwardly_pick_rs(thing1,thing2, defnick, defsub)
         redname = self._get_redname(channel, name)
 
-        ft = snooflair.get_flair(subname, redname)
+        ft = get_flair(subname, redname)
 
         if ft:
             self._reply_with_flair(irc, redname, ft, subname)
