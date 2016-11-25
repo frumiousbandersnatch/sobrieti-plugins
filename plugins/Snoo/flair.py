@@ -16,6 +16,7 @@ def get_recent_search(subreddit, username):
     url = search_urlpat.format(**locals())
     params = dict(sort='new', q=username, restrict_sr='on', t='all')
     r = requests.get(url, params = params, headers=headers)
+    #print url, params, r.json()
     return r.json()
 def get_recent_comments(subreddit, username):
     url = comment_urlpat.format(**locals())
@@ -24,13 +25,18 @@ def get_recent_comments(subreddit, username):
     return r.json()
     
 def get_data_entry(data, subreddit, username, entryname = 'author_flair_text'):
-    if data is None: return
+    if data is None:     
+        return
     data = data.get('data',None)
-    if data is None: return
+    if data is None: 
+        print 'No data for %s in %s' % (username, subreddit)
+        return
     children = data.get('children',[])
     for child in children:
         data = child.get('data',None)
-        if data is None: continue
+        if data is None: 
+#            print 'No child data for %s in %s, child=%s' % (username, subreddit, str(child))
+            continue
         sub = data.get('subreddit',None)
         if sub != subreddit: continue
         author = data.get('author',None)
@@ -40,10 +46,11 @@ def get_data_entry(data, subreddit, username, entryname = 'author_flair_text'):
 
 def get_flair(subreddit, username):
     res = get_recent_search(subreddit, username)
-    if not res: 
-        res = get_recent_comments(subreddit, username)
-    if not res: 
-        return
+    flair = get_data_entry(res, subreddit, username)
+    if flair:
+        return flair    
+
+    res = get_recent_comments(subreddit, username)
     flair = get_data_entry(res, subreddit, username)
     return flair
 
