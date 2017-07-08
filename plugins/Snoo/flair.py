@@ -14,7 +14,7 @@ search_urlpat = "https://www.reddit.com/r/{subreddit}/search.json"
 
 def get_recent_search(subreddit, username):
     url = search_urlpat.format(**locals())
-    params = dict(sort='new', q=username, restrict_sr='on', t='all')
+    params = dict(sort='new', q="author:"+username, restrict_sr='on', t='all')
     r = requests.get(url, params = params, headers=headers)
     return r.json()
 def get_recent_comments(subreddit, username):
