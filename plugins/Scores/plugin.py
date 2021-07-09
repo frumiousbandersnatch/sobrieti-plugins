@@ -74,7 +74,7 @@ class Scores(callbacks.Plugin, plugins.ChannelDBHandler):
         db = self.getDb(channel)
         res = [x for x in db]
 
-        print order
+        print(order)
         sortf = {
             'low': lambda a,b: (a.ups-a.downs) - (b.ups-b.downs),
             'high': lambda a,b: (b.ups-b.downs) - (a.ups-a.downs),
