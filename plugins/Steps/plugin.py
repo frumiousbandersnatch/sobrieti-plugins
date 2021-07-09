@@ -36,8 +36,9 @@ import supybot.callbacks as callbacks
 
 import random
 
-import steps
-reload(steps)
+from . import steps
+import importlib
+importlib.reload(steps)
 
 def get_flavor_mod(flavor):
     if flavor in steps.__all__:

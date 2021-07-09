@@ -7,8 +7,9 @@ import pickle
 import json
 import re
 import cgi
-from urllib import urlencode
-from urllib2 import urlopen, HTTPError
+from urllib.parse import urlencode
+from urllib.request import urlopen
+from urllib.error import HTTPError
 
 rashurl = 'http://sobrieti.bot.nu/rqdb'
 #rashurl = 'http://stop.zzl.org/qdb'
@@ -21,19 +22,19 @@ def apicall(cmd, **params):
         args.update(params)
 
     url = apiurl + '?' + urlencode(args)
-    print 'APICALL',url
+    print('APICALL',url)
 
     try: 
         fp = urlopen(url)
-    except HTTPError, msg:
-        print msg
+    except HTTPError as msg:
+        print(msg)
         raise
     contents = fp.read()
     try:
         data = json.loads(contents)
-    except ValueError,msg:
-        print msg
-        print contents
+    except ValueError as msg:
+        print(msg)
+        print(contents)
         return None
     return data
 
@@ -91,7 +92,7 @@ def upload_file(filename):
     for line in fp.readlines():
         quote = wash_quote(line.strip()).strip()
         data = apicall('add', quote=quote)
-        print data
+        print(data)
         continue
     return
 

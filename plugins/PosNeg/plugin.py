@@ -92,13 +92,13 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         np = nm = 0
         maxn = 0
         for rec in db:
-            print '#%03d %s %s' % (rec.id,rec.pn,rec.pattern)
+            print('#%03d %s %s' % (rec.id,rec.pn,rec.pattern))
             if rec.pn == '+': np += 1
             if rec.pn == '-': nm += 1
             if rec.number > maxn: maxn = rec.number
         irc.reply('I have %d positive and %d negative reinforcements'
                   ' for up to %d things' % (np, nm, maxn))
-        print 'In file: %s' % self._posneg_filename
+        print('In file: %s' % self._posneg_filename)
         return
     stats = wrap(stats, ['channel'])
             
@@ -114,9 +114,9 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         if not choose_from:
             return
         res = random.choice(choose_from)
-        print 'PosNeg:'
-        print res.pattern
-        print names
+        print('PosNeg:')
+        print(res.pattern)
+        print(names)
         return res.pattern.format(*names)
 
     def hate(self, irc, msg, args, channel, things):
@@ -139,7 +139,7 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         Apply some positive reinforcement to <things> in <channel>.
         """
         msg = self._resolve(channel, '+', things)
-        print things, msg
+        print(things, msg)
         if msg:
             irc.reply(msg, action = True)
             return
@@ -269,7 +269,7 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         Join the entire DB from <fromchannel> in to <tochannel>.  
         If <fromID#> given join just that one entry.
         '''
-        print 'joindb("%s","%s",%s)' % (fromchannel, tochannel, ident)
+        print('joindb("%s","%s",%s)' % (fromchannel, tochannel, ident))
 
         from_db = self.getDb(fromchannel)
         to_db = self.getDb(tochannel)
@@ -278,13 +278,13 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         def add_if_new(rec):
             for has in to_db:
                 if rec == has:
-                    print 'Already have record in %s at #%d: %s' % \
-                        (fromchannel, has.id, has.pattern)
+                    print('Already have record in %s at #%d: %s' % \
+                        (fromchannel, has.id, has.pattern))
                     return
                 continue
             newident = to_db.add(rec)
-            print 'Adding record from %s at #%d: %s' % \
-                (fromchannel, newident, rec.pattern)
+            print('Adding record from %s at #%d: %s' % \
+                (fromchannel, newident, rec.pattern))
             added.append(newident)
             return newident
 

@@ -15,19 +15,19 @@ def apicall(cmd, **params):
         args.update(params)
 
     url = apiurl + '?' + urlencode(args)
-    print 'APICALL',url
+    print('APICALL',url)
 
     try: 
         fp = urlopen(url)
-    except HTTPError, msg:
-        print msg
+    except HTTPError as msg:
+        print(msg)
         raise
     contents = fp.read()
     try:
         data = json.loads(contents)
-    except ValueError,msg:
-        print msg
-        print contents
+    except ValueError as msg:
+        print(msg)
+        print(contents)
         return None
     return data
 

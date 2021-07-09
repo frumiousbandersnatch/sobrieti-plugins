@@ -55,7 +55,7 @@ class Tavtime(callbacks.Plugin):
         seconds = int(time.time())
         quadraels, extraraels, subraels, remainder = yi_olde_timey(seconds)
         left = "%d and %d to go" % (3 - extraraels, 432000 - remainder)
-        print 'yi:', quadraels, extraraels, subraels, remainder
+        print('yi:', quadraels, extraraels, subraels, remainder)
         if extraraels == 4:
             irc.reply('Yes! PARTAI!', prefixNick=False)
             return
@@ -67,9 +67,9 @@ class Tavtime(callbacks.Plugin):
         seconds = int(time.time())
         quadraels, extraraels, subraels, remainder = yi_olde_timey(seconds)
         rep = '%s  -  It is now %d:%d:%d:%d  -  %s' % \
-            (unichr(8987),
+            (chr(8987),
              quadraels, extraraels, subraels, remainder, 
-             unichr(8986))
+             chr(8986))
         rep = rep.encode('utf-8')
         irc.reply(rep, prefixNick=False)
         return

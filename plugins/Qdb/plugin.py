@@ -34,8 +34,9 @@ import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 
-import qdbapi
-reload (qdbapi)
+from . import qdbapi
+import importlib
+importlib.reload (qdbapi)
 
 class Qdb(callbacks.Plugin):
     """Add the help for "@plugin help Qdb" here
@@ -112,7 +113,7 @@ class Qdb(callbacks.Plugin):
         Add the quote to the database.  It is best to type "<nick>"
         before a line to indicate the speaker.  Lines can be separated
         with the bar "|" symbol.'''
-        print 'ADD',quote
+        print('ADD',quote)
         quote = ' '.join(quote)
         quote = qdbapi.wash_quote(quote)
         data = qdbapi.apicall('add', quote=quote)
