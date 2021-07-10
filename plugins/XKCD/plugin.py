@@ -77,7 +77,7 @@ def xkcd_typify(**fields):
     return {k:tf[k](v) for k,v in fields.items()}
 
 def xkcd_arr_to_dict(field_list):
-    print(field_list)
+    #print(field_list)
     return {f[0]:f[1](a) for f,a in zip(xkcd_fields, field_list)}
 
 
@@ -111,7 +111,7 @@ def xkcd_get(num=None):
     except utils.web.Error as err:
         raise ValueError(f'no xkcd #{num}')
     info = json.loads(jtext)
-    print(f'got xkcd json: {info}')
+    #print(f'got xkcd json: {info}')
     info = xkcd_typify(**info)
     return  XkcdRecord(**info) # xkcd.com can crash us by extending return values! :)
 
@@ -266,7 +266,7 @@ class XKCD(callbacks.Plugin):
             text = msg.args[1]
         lines = list()
         for url in utils.web.urlRe.findall(text):
-            print(f'maybe url {url}')
+            #print(f'maybe url {url}')
             if not url.startswith(xkcd_base_url):
                 continue
             r = re.search(xkcd_url_id_re, url)
@@ -278,7 +278,7 @@ class XKCD(callbacks.Plugin):
                 continue
             s = self.db.get(num)
             lines.append(str(s))
-            print(f'snarfed {s}')
+            #print(f'snarfed {s}')
         if lines:
             irc.reply(', '.join(lines), sendImmediately=True)
 
@@ -293,7 +293,7 @@ class XKCD(callbacks.Plugin):
             irc.error(err)
             return
         rep = str(rec)
-        print(rep)
+        #print(rep)
         irc.reply(rep)
     xkcd = wrap(info, ['channeldb', optional('id')])
     info = xkcd
