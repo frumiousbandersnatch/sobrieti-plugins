@@ -41,7 +41,7 @@ random.seed()
 class Dice(callbacks.Plugin):
     """Roll dice and display the results."""
 
-    dice_str = [unichr(9856+ind) for ind in range(6)]
+    dice_str = [chr(9856+ind) for ind in range(6)]
 
     def dice(self, irc, msg, args, number):
         """[<number>]
