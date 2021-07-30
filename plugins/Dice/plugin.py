@@ -41,7 +41,8 @@ random.seed()
 class Dice(callbacks.Plugin):
     """Roll dice and display the results."""
 
-    dice_str = [chr(9856+ind) for ind in range(6)]
+    #dice_str = [chr(9856+ind) for ind in range(6)]
+    dice_str = [chr(0xf6c9+ind) for ind in range(6)]
 
     def dice(self, irc, msg, args, number):
         """[<number>]
@@ -56,7 +57,6 @@ class Dice(callbacks.Plugin):
             die.append(Dice.dice_str[r-1])
         rolls = ' '.join(die)
         resp = '%s = %d' % (rolls, tot)
-        resp = resp.encode('utf8','ignore')
         irc.reply(resp)
     dice = wrap(dice, [optional('int',2)])
 
@@ -64,7 +64,7 @@ class Dice(callbacks.Plugin):
         """Ask a yes or no question or a 'this or that or the other'"""
         if 'or' in stuff:
             stuff = ' '.join(stuff).split(' or ')
-            res = random.choice(stuff).strip().encode('utf-8')
+            res = random.choice(stuff).strip()
         else:
             res = random.choice(['yes', 'no'])
 
