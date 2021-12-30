@@ -35,8 +35,7 @@ def resolve_format(dat, formatter = stringify, **extra):
     return formatted
     
 
-import UserDict
-class Bag(UserDict.DictMixin):
+class Bag:
     def __init__(self, store=None, **kwds):
         if store is None: 
             store = dict()
@@ -80,7 +79,7 @@ class Bag(UserDict.DictMixin):
         else:
             value = set(value)
         self._bag[name] |= value
-        print self._bag[name],value
+        print (self._bag[name],value)
         self.sync()
 
     def get_all(self, name):
@@ -108,7 +107,7 @@ def main(*args):
     b = Bag(store=db)
     if args[1] == 'dump':
         for k in b.keys():
-            print k,b.get_all(k)
+            print (k,b.get_all(k))
     if args[1] == 'add':
         b.add(args[2], args[3])
 

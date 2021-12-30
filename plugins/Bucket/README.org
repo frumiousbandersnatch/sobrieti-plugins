@@ -1,0 +1,29 @@
+#+title: Mostly compatible implementation of XKCD Bucket
+
+* Goals
+
+- Provide a supybot plugin that acts similar to XKCD Bucket as documented [[http://sobrieti.bot.nu/pail/][here]].
+- Use SQLite3 instead of MySQL
+- Provide a converter from Bucket's MySQL schema to our SQLite3 schema
+
+Why? Because I am sick of dealing with Perl and MySQL for ~pail~ on snoonet.
+
+* Features
+
+- [X] say
+  - [X] Implement this at the plugin level
+- [X] inventory (=/me gives bot ABC=)
+  - [X] low level item management
+  - [ ] plugin layer
+
+- [ ] define factoid with =is= / =are= literal
+- [ ] define factoid with =<reply>= / =<action>= literal
+- [ ] define factoid with arbitrary =<<verb>>= (=A <loves> B=)
+- [ ] remember quote
+- [ ] listing factoid
+- [ ] editing factoid
+- [ ] =undo last=
+- [ ] variables (word class, user name, object, number)
+- [ ] variable interpolation
+- [ ] gender
+- [ ] special functions
