@@ -57,8 +57,15 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     threaded = True
     public = True
     regexps = []
-    addressedRegexps = ["isare",]
+    addressedRegexps = ["factoid", "explain"]
     unaddressedRegexps = ["say", "items1", "items2"]
+
+    def invalidCommand(self, irc, msg, tokens):
+        s = ' '.join(tokens)
+        for (r, name) in self.addressedRes:
+            self.log.debug(f'Bucket: dispatch {name} {repr(r)} {repr(s)}')
+            for m in r.finditer(s):
+                self._callRegexp(name, irc, msg, m)
 
     def __init__(self, irc):
         callbacks.PluginRegexp.__init__(self, irc)
@@ -73,25 +80,67 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         text = text.capitalize() + "!"
         irc.reply(text, prefixNick=False)
 
+    def inventory(self, irc, msg, args, channel):
+        """[<channel>]
+
+        What is in the bucket?
+        """
+        db = self.getDb(channel)
+        have = db.held_items()
+        have = ', '.join(have)
+        irc.reply(f'is carrying {have}.', prefixNick=False, action=True)
+    inventory = wrap(inventory, ['channeldb'])
+
+    def literal(self, irc, msg, args, channel, subject):
+        """[<channel>] <subject>
+
+        All that is known about a subject.
+        """
+        db = self.getDb(channel)
+        lines = []
+        for fid, (s,l,t) in sorted(db.facts(subject).items()):
+            if l not in ("is","are"):
+                l = f'<{l}>'
+            lines.append(f'(#{fid}) {l} {t}')
+        body = '|'.join(lines)
+        reply = f'{subject} {body}'
+        irc.reply(reply)
+    literal = wrap(literal, ['channeldb', 'text'])
+
     ### Common for items1/items2 because I do not know how to combine
-    ### all three into one.
+    ### all three regexp into one....
     def _itemsx(self, irc, msg, regex):
         chan = msg.args[0]
         me = regex["nick"]
         item = regex["item"]
+
         if me != irc.nick:
             return
         db = self.getDb(chan)
-        db.item_give(item)
+
+        # add "someone", etc.  and move this to a single method
+        more = dict(who=msg.nick, to=irc.nick, item=item)
+
+        have = db.held_items()
+        if item in have:
+            _,_,reply = db.choose_fact("duplicate item")            
+            reply = db.resolve(reply, **more)
+            irc.reply(reply, prefixNick=False, action=False)
+            return
+
         max_items = self.registryValue('max_items')
-        have = db.items_holding()
-        if len(have) > max_items:
-            old = have[0]
-            db.item_drop(old)
-            chirp = f'drops {old} and takes {item}'
+        if len(have) >= max_items:
+            _,_,reply = db.choose_fact("pickup full")
         else:
-            chirp = f'now contains {item}'
-        irc.queueMsg(ircmsgs.action(chan, chirp))
+            _,_,reply = db.choose_fact("takes item")
+
+        reply = db.resolve(reply, **more)
+
+        # must give item after resolution as a 'pickup full' will drop
+        # one and we don't want to drop the one we were just given.
+        db.give_item(item)
+
+        irc.reply(reply, prefixNick=False, action=False)
         return
 
     # /me puts {item} in Bucket.
@@ -109,19 +158,61 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         r".*"
         print("junk:")
         print(f'msg:|{msg}|')
-        print(f'|{msg.args[1]}|')
+        print(f'|{repr(msg.args[1])}|')
         if regex:
             print(regex, regex.groups())
 
-
-    def isare(self, irc, msg, regex):
-        r"^(?P<key>.*) +(?P<isare>is|are) +(?P<value>.*)$"
-        try:
-            key = regex["key"]
-            val = regex["value"]
-            singular = regex["isare"] == "is"
-        except IndexError:
+    def factoid(self, irc, msg, regex):
+        r"^(?P<subject>.*) +(?P<link>is|are|[<][^>]+[>]) +(?P<tidbit>.*)$"
+        chan = msg.args[0]
+        if not regex:
+            self.log.debug(f'factoid: no match {repr(msg.args[1])}')
             return
+
+        subject = regex['subject']
+        tidbit = regex['tidbit']
+        link = regex['link']
+        if link.startswith("<") and link.endswith(">"):
+            link = link[1:-1]
+        if not all ((subject, link, tidbit)):
+            self.log.debug(f'factoid: incomplete "{subject}" "{link}" "{tidbit}"')
+            return
+        
+        more = dict(who=msg.nick, to=irc.nick, subject=subject)
+
+        db = self.getDb(chan)
+        fid, new = db.factoid(subject, link, tidbit)
+        if new:
+            rep_sub = "new fact"
+        else:
+            rep_sub = "existing fact"
+        _,_,reply = db.choose_fact(rep_sub)
+        self.log.debug(f'factoid: {rep_sub}: "{reply}" {more}')
+        reply = db.resolve(reply, **more)
+        irc.reply(reply, prefixNick=False, action=False)        
+        
+
+    def explain(self, irc, msg, regex):
+        r"^(?P<subject>((?!\s*is|are|[<][^>]+[>]).)*)$"
+        chan = msg.args[0]
+        db = self.getDb(chan)
+        subject = regex['subject']
+        _,link,tidbit = db.choose_fact(subject)
+
+        self.log.debug(f'explain: "{subject}" "{link}" "{tidbit}"')
+
+        # fixme: $someone, etc
+        more = dict(who=msg.nick, to=irc.nick)
+        tidbit = db.resolve(tidbit, **more)            
+        if link == 'reply':
+            irc.reply(tidbit, prefixNick=False)
+            return
+        if link == 'action':
+            irc.reply(tidbit, action=True)
+            return
+        reply = ' '.join([subject, link, tidbit])
+        irc.reply(reply)
+        
 
 Class = Bucket
 

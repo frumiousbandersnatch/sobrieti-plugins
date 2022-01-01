@@ -8,22 +8,108 @@
 
 Why? Because I am sick of dealing with Perl and MySQL for ~pail~ on snoonet.
 
-* Features
+* User Manual
 
-- [X] say
-  - [X] Implement this at the plugin level
-- [X] inventory (=/me gives bot ABC=)
-  - [X] low level item management
-  - [ ] plugin layer
+t.b.d
 
-- [ ] define factoid with =is= / =are= literal
-- [ ] define factoid with =<reply>= / =<action>= literal
-- [ ] define factoid with arbitrary =<<verb>>= (=A <loves> B=)
-- [ ] remember quote
-- [ ] listing factoid
-- [ ] editing factoid
-- [ ] =undo last=
+* Differences from XKCD Bucket
+
+The usage of this bucket is but not exactly the same as the OG XKCD
+bucket. 
+
+** Special variables
+
+Some =$= variables in a string can be replaced with things bucket knows.
+Some of these variables can have side effects.  A few of these
+variables have changed slightly from their XKCD bucket equivalents or
+provide new functionality.
+
+- =$item= :: any item previously given to the bot but not necessarily
+  still "held" by the bot.  (No past equivalent.)
+
+- =$held= :: an item currently held.  (Used to be =$item=)
+
+- $take :: any item, bot will now hold it (Used to be =$newitem=)
+
+- =$give= :: a held item, bot will drop it (Used to be =$giveitem=)
+
+Users may define any "kind" of term and the name of the kind can be
+used as a variable, eg =$item= will replace a term of kind ~item~.  
+
+** Database schema
+
+Besides switching from MySQL to SQLite3, the schema is made simpler
+and unified.  The ~terms~ table provides kinds of text terms.  Eg one
+kind is ~item~ which names things the bucket may have held at one time.
+A fact is a triplet association of ~subject~, ~link~ (verb) and ~tidbit~.  
+
+** Implementation
+
+Perl is replaced with Python.  POE is replaced with supybot.
+
+
+* Development roadmap
+
+The bot is split into:
+
+- plugin :: handles interfacing to supybot/limnoria IRC
+- store :: interface to DB and basic functionality semantics but free from IRC
+- prime :: some initial canned data that may be loaded into the DB
+- dumpload :: utility to convert from XKCD Bucket MySQL DB to sqlite3 used by this bot
+
+** Plugin
+
+Pure plugin/IRC code for "special functions":
+
+- [X] say it again
+- [ ] sexchange. ex->sex replacement, 
+- [ ] bad-ass thing, bad ass-thing replacement.
+
+Those not listed are not in scope.
+
+The plugin also is a translational barrier between IRC stuff and the
+store.  It provides various regex based commands in addition to normal
+supybot commands
+
+- [ ] use auth capabilities to allow change to "system" fact subjects
+- [ ] single way to prepare =more= parameters (~$who~, ~$someone~)
+- [X] regex based "give items"
+- [X] command: ~inventory~
+- [X] regex ~is~ / ~are~ fact definition
+- [X] regex ~<reply>~ / ~<action>~ fact definition
+- [X] regex ~<<verb>>~ fact definition
+- [X] drop item if full
+- [X] command: ~literal~ factoid list 
+- [ ] command: editing factoid
+- [ ] command: ~undo last~ factoid
+- [ ] command: remember quote (requires keeping recent history)
 - [ ] variables (word class, user name, object, number)
 - [ ] variable interpolation
 - [ ] gender
-- [ ] special functions
+
+** Store
+
+- [X] schema init
+- [X] singular idempotent term definition and id return
+- [X] id->term lookup
+- [X] term lookups by kind
+- [X] term lookups by random
+- [X] resolve ~$var~ variables, including with side effect
+  - [X] random held, give, take
+  - [X] random kind
+- [X] singular idempotent factoid defintion and id return
+
+** Prime
+
+- [X] default special replies
+- [ ] change these to "system" 
+
+** Dump/load
+
+- [X] basic MySQL access
+- [X] understand and handle munged character encoding
+- [X] facts 
+- [X] items
+- [X] vars
+- [X] basic CLI
+- [ ] nicer CLI with mysql parameters, controlling individual actions
