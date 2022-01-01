@@ -80,9 +80,9 @@ class Bucket:
     def __init__(self, dbname=":memory:"):
         self.db = prime.init(dbname)
 
-        for subject, tidbits in prime.system_facts.items():
-            for tidbit in tidbits:
-                self.factoid(subject, "reply", tidbit, False)
+        for subject, lts in prime.system_facts.items():
+            for link, tidbit in lts:
+                self.factoid(subject, link, tidbit, False)
         self.db.commit()
 
     def idterm(self, tid):
