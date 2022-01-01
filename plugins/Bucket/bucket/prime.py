@@ -3,7 +3,9 @@
 Prime a bucket with some entries
 '''
 
-default_special_replies = {
+import sqlite3
+
+system_facts = {
     "don't know": [
         "A thousand apologies, effendi, but I do not understand.",
         "Beeeeeeeeeeeeep!",
@@ -61,15 +63,73 @@ default_special_replies = {
     # "uses reply":[],
     # "automatic haiku":[],
 }
-def facts(bs, data=default_special_replies, link='reply'):
-    '''
-    Fill special replies
-    '''
-    for subject, tidbits in data.items():
-        for tidbit in tidbits:
-            bs.factoid(subject, link, tidbit, False)
-    bs.db.commit()
+
     
+def init(dbname):
+    '''
+    Initialize the database
+    '''
+
+    db = sqlite3.connect(dbname)
+    cur = db.cursor()
+
+    cur.execute("PRAGMA foreign_keys = ON")
+    
+    # A term is text of a certain kind.  The kind is a free-form
+    # word but some are reserved.  An "item" kind is something the
+    # bot holds or has held, a factoid is a triplet of a
+    # "subject", a "link" and a "tidbit" kind.  Other kinds are
+    # used to allow mad lib substitution in text
+
+    cur.execute("""
+CREATE TABLE IF NOT EXISTS terms (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+kind TEXT NOT NULL,
+text TEXT NOT NULL,
+UNIQUE(kind, text))""")
+
+    # facts
+    cur.execute("""
+CREATE TABLE IF NOT EXISTS facts (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+subject_id INTEGER NOT NULL,
+link_id INTEGER NOT NULL,
+tidbit_id INTEGER NOT NULL,
+FOREIGN KEY(subject_id) REFERENCES terms(id) ON DELETE CASCADE,
+FOREIGN KEY(link_id) REFERENCES terms(id)    ON DELETE CASCADE,
+FOREIGN KEY(tidbit_id) REFERENCES terms(id)  ON DELETE CASCADE,
+UNIQUE(subject_id, link_id, tidbit_id)
+)""")
+
+    for fk in ("subject", "link", "tidbit"):
+        cur.execute(f"""
+CREATE INDEX IF NOT EXISTS {fk}_index ON facts({fk}_id)
+        """)
+
+    # Currently holding these items, item_id points to a value.
+    cur.execute("""
+CREATE TABLE IF NOT EXISTS holding (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+item_id INTEGER NOT NULL,
+FOREIGN KEY(item_id) REFERENCES terms(id) ON DELETE CASCADE,
+UNIQUE(item_id)
+)""")
+    cur.execute("""
+CREATE INDEX IF NOT EXISTS holding_index ON holding(item_id)
+        """)
+    
+    cur.execute("""
+CREATE TRIGGER drop_deleted_item
+BEFORE DELETE ON terms
+BEGIN
+    DELETE FROM holding WHERE holding.item_id = OLD.id
+END
+    """)
+
+    db.commit()
+    return db
+
+
 if '__main__' == __name__:
     import sys
     import store

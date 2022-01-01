@@ -83,8 +83,6 @@ supybot commands
 - [ ] command: editing factoid
 - [ ] command: ~undo last~ factoid
 - [ ] command: remember quote (requires keeping recent history)
-- [ ] variables (word class, user name, object, number)
-- [ ] variable interpolation
 - [ ] gender
 
 ** Store
@@ -98,6 +96,10 @@ supybot commands
   - [X] random held, give, take
   - [X] random kind
 - [X] singular idempotent factoid defintion and id return
+- [X] variables (word class, user name, object, number)
+- [X] variable interpolation
+- [ ] factoid deletion
+- [ ] factoid editing
 
 ** Prime
 

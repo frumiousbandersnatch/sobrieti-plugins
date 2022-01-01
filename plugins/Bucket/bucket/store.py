@@ -8,6 +8,9 @@ from string import Template
 import random
 import sqlite3
 
+import prime
+
+
 # an RE matching $kind or ${kind} 
 kind_re = re.compile("[$][{]?([^ 0-9]\w+)[}]?")
 
@@ -74,41 +77,12 @@ class RandomTake:
 class Bucket:
     'The dumbest smart container around'
 
-    def __init__(self, filename):
-        self.db = sqlite3.connect(filename)
-        cur = self.db.cursor()
-        
-        # A term is text of a certain kind.  The kind is a free-form
-        # word but some are reserved.  An "item" kind is something the
-        # bot holds or has held, a factoid is a triplet of a
-        # "subject", a "link" and a "tidbit" kind.  Other kinds are
-        # used to allow mad lib substitution in text
+    def __init__(self, dbname=":memory:"):
+        self.db = prime.init(dbname)
 
-        cur.execute("""
-CREATE TABLE IF NOT EXISTS terms (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-kind TEXT NOT NULL,
-text TEXT NOT NULL,
-UNIQUE(kind, text))""")
-
-        # facts
-        cur.execute("""
-CREATE TABLE IF NOT EXISTS facts (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-subject_id INTEGER NOT NULL,
-link_id INTEGER NOT NULL,
-tidbit_id INTEGER NOT NULL,
-UNIQUE(subject_id, link_id, tidbit_id)
-)""")
-
-        # Currently holding these items, item_id points to a value.
-        cur.execute("""
-CREATE TABLE IF NOT EXISTS holding (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-item_id INTEGER NOT NULL,
-UNIQUE(item_id)
-)""")
-
+        for subject, tidbits in prime.system_facts.items():
+            for tidbit in tidbits:
+                self.factoid(subject, "reply", tidbit, False)
         self.db.commit()
 
     def idterm(self, tid):
@@ -248,6 +222,19 @@ UNIQUE(item_id)
         if commit:
             self.db.commit()
         return (cur.lastrowid, True)
+
+    def purge_fact(self, subject):
+        '''
+        Remove a subject and all its facts.
+        '''
+        cur = self.db.cursor()
+        # ....
+
+        # this will remove the factoids by CASCADE
+        cur.execute("DELETE FROM terms WHERE kind=? and text=?",
+                    ("subject", subject))
+        self.db.commit()
+        
 
     def choose_fact(self, subject=None):
         '''
