@@ -4,7 +4,7 @@ A CLI to bucket
 '''
 
 import click
-import store
+from . import store
 
 @click.group("cli")
 @click.pass_context

@@ -8,11 +8,11 @@ from string import Template
 import random
 import sqlite3
 
-import prime
+from . import prime
 
 
 # an RE matching $kind or ${kind} 
-kind_re = re.compile("[$][{]?([^ 0-9]\w+)[}]?")
+kind_re = re.compile(r"[$][{]?([^ 0-9]\w+)[}]?")
 
 # Need also to support: $who, $someone, $inventory (list items)
 class RandomTerm:
@@ -199,7 +199,14 @@ class Bucket:
         # Iterate until all known kinds of vars are resolved.
         return self.resolve(new_text, **more)
 
-    ### Fact interface
+    def purge_term(self, text, kind):
+        '''
+        Purge a term.
+        '''
+        self.sql("DELETE FROM terms where kind=? and text=?",
+                 (kind, text))
+    ### Fact interface.
+    # The label "factoid" implies a triplet: (subject, link, tidbit)
 
     def factoid(self, subject, link, tidbit, commit=True):
         '''
@@ -209,7 +216,6 @@ class Bucket:
         sid = self.term(subject, "subject", commit)
         lid = self.term(link, "link", commit)
         tid = self.term(tidbit, "tidbit", commit)
-        #print('IDS:',sid,lid,tid)
 
         cur = self.db.cursor()
         got = cur.execute("""SELECT id FROM facts 
@@ -223,17 +229,28 @@ class Bucket:
             self.db.commit()
         return (cur.lastrowid, True)
 
-    def purge_fact(self, subject):
+    def purge_subject(self, subject):
         '''
-        Remove a subject and all its facts.
+        Purge a subject, all its facts and any orphaned tidbits.
         '''
-        cur = self.db.cursor()
-        # ....
+        self.purge_term(subject, "subject")
 
-        # this will remove the factoids by CASCADE
-        cur.execute("DELETE FROM terms WHERE kind=? and text=?",
-                    ("subject", subject))
-        self.db.commit()
+    def purge_factoid(self, subject, link, tidbit):
+        '''
+        Remove a specific factoid.
+
+        This will also purge any orphaned tidbits.
+        '''
+        self.sql("""
+        DELETE FROM facts
+        WHERE ROWID IN (
+          SELECT fact.ROWID from facts fact
+          LEFT JOIN terms subject ON subject.id = fact.subject_id
+          LEFT JOIN terms link    ON link.id    = fact.link_id
+          LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
+          WHERE subject.text=? AND link.text=? AND tidbit.text=?
+        )""", (subject, link, tidbit))
+
         
 
     def choose_fact(self, subject=None):
@@ -300,6 +317,22 @@ class Bucket:
         cur.execute("INSERT OR IGNORE INTO holding(item_id) VALUES(?)", (iid,))
         self.db.commit()
         return iid
+
+    def sql(self, query, args=(), commit=True):
+        '''
+        Execute SQL query
+        '''
+        cur = self.db.cursor()
+        got = cur.execute(query, args)
+        if commit:
+            self.db.commit()
+        return got
+
+    def purge_item(self, item):
+        '''
+        Delete item forever, drop if holding.
+        '''
+        self.purge_term(item, "item")
 
     def drop_item(self, item):
         '''

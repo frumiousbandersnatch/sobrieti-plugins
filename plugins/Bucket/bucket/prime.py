@@ -88,41 +88,65 @@ kind TEXT NOT NULL,
 text TEXT NOT NULL,
 UNIQUE(kind, text))""")
 
-    # facts
+    # facts are association of three terms
     cur.execute("""
 CREATE TABLE IF NOT EXISTS facts (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 subject_id INTEGER NOT NULL,
 link_id INTEGER NOT NULL,
 tidbit_id INTEGER NOT NULL,
-FOREIGN KEY(subject_id) REFERENCES terms(id) ON DELETE CASCADE,
-FOREIGN KEY(link_id) REFERENCES terms(id)    ON DELETE CASCADE,
-FOREIGN KEY(tidbit_id) REFERENCES terms(id)  ON DELETE CASCADE,
+FOREIGN KEY(subject_id) REFERENCES terms(id),
+FOREIGN KEY(link_id) REFERENCES terms(id),
+FOREIGN KEY(tidbit_id) REFERENCES terms(id),
 UNIQUE(subject_id, link_id, tidbit_id)
 )""")
-
     for fk in ("subject", "link", "tidbit"):
         cur.execute(f"""
 CREATE INDEX IF NOT EXISTS {fk}_index ON facts({fk}_id)
         """)
 
+    # Delete facts if any of their terms are deleted.
+    cur.execute("""
+CREATE TRIGGER purge_fact
+BEFORE DELETE ON terms
+BEGIN
+    DELETE FROM facts WHERE subject_id = OLD.id;
+    DELETE FROM facts WHERE link_id    = OLD.id;
+    DELETE FROM facts WHERE tidbit_id  = OLD.id;
+END
+    """)
+
+    # If we delete a factoid, delete the tidbit if no other facts
+    # still reference it.
+    cur.execute("""
+CREATE TRIGGER prune_tidbit
+AFTER DELETE ON facts
+BEGIN
+    DELETE FROM terms 
+    WHERE terms.id = OLD.tidbit_id AND NOT EXISTS (
+      SELECT 1 FROM facts WHERE tidbit_id = OLD.tidbit_id
+    );
+END
+    """)
+
+    #
     # Currently holding these items, item_id points to a value.
+    #
     cur.execute("""
 CREATE TABLE IF NOT EXISTS holding (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 item_id INTEGER NOT NULL,
-FOREIGN KEY(item_id) REFERENCES terms(id) ON DELETE CASCADE,
+FOREIGN KEY(item_id) REFERENCES terms(id),
 UNIQUE(item_id)
 )""")
     cur.execute("""
 CREATE INDEX IF NOT EXISTS holding_index ON holding(item_id)
         """)
-    
     cur.execute("""
 CREATE TRIGGER drop_deleted_item
 BEFORE DELETE ON terms
 BEGIN
-    DELETE FROM holding WHERE holding.item_id = OLD.id
+    DELETE FROM holding WHERE holding.item_id = OLD.id;
 END
     """)
 
