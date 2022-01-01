@@ -3,3 +3,6 @@
 local
 *.bak
 *.db
+test-*
+conf
+logs

@@ -251,9 +251,7 @@ class Bucket:
           WHERE subject.text=? AND link.text=? AND tidbit.text=?
         )""", (subject, link, tidbit))
 
-        
-
-    def choose_fact(self, subject=None):
+    def choose_factoid(self, subject=None):
         '''
         Return a random factoid as (s,l,t) triplet.
 
@@ -278,7 +276,24 @@ class Bucket:
         slt = [self.idterm(tid) for tid in got]
         return tuple([one[1] for one in slt])
         
-    def facts(self, subject):
+    def choose_factoid_like(self, subject, fragment):
+        '''
+        Return a random factoid on a subject which has fragment match.
+        '''
+        got = self.sql("""
+        SELECT subject.text, link.text, tidbit.text
+        FROM facts fact
+        LEFT JOIN terms subject ON subject.id = fact.subject_id
+        LEFT JOIN terms link    ON link.id    = fact.link_id
+        LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
+        WHERE subject.text=? and tidbit.text like ?
+        ORDER BY RANDOM() LIMIT 1
+        """, (subject, '%'+fragment+'%')).fetchone()
+        if not got:
+            raise KeyError(f'no facts for subject "{subject}" like "{fragment}"')
+        return got
+
+    def factoids(self, subject):
         '''
         Return all facts on subject as as dict {id:(triplet)}
         '''
@@ -297,11 +312,11 @@ class Bucket:
             ret[one[0]] = tuple([subject, one[1], one[2]])
         return ret
 
-    def render_fact(self, slt, **more):
+    def render_factoid(self, factoid, **more):
         '''
         Given a fact (subject,link,tidbit) render to string
         '''
-        slt = list(slt)
+        slt = list(factoid)
         slt[-1] = self.resolve(slt[-1])
         return ' '.join(slt, **more)
 

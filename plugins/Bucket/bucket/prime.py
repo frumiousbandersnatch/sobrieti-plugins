@@ -116,7 +116,7 @@ CREATE INDEX IF NOT EXISTS {fk}_index ON facts({fk}_id)
 
     # Delete facts if any of their terms are deleted.
     cur.execute("""
-CREATE TRIGGER purge_fact
+CREATE TRIGGER IF NOT EXISTS purge_fact
 BEFORE DELETE ON terms
 BEGIN
     DELETE FROM facts WHERE subject_id = OLD.id;
@@ -128,7 +128,7 @@ END
     # If we delete a factoid, delete the tidbit if no other facts
     # still reference it.
     cur.execute("""
-CREATE TRIGGER prune_tidbit
+CREATE TRIGGER IF NOT EXISTS prune_tidbit
 AFTER DELETE ON facts
 BEGIN
     DELETE FROM terms 
@@ -152,7 +152,7 @@ UNIQUE(item_id)
 CREATE INDEX IF NOT EXISTS holding_index ON holding(item_id)
         """)
     cur.execute("""
-CREATE TRIGGER drop_deleted_item
+CREATE TRIGGER IF NOT EXISTS drop_deleted_item
 BEFORE DELETE ON terms
 BEGIN
     DELETE FROM holding WHERE holding.item_id = OLD.id;

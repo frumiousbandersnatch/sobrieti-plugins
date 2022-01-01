@@ -30,10 +30,16 @@
 
 from supybot.test import *
 
-class BucketTestCase(PluginTestCase):
+class BucketTestCase(ChannelPluginTestCase):
     plugins = ('Bucket',)
 
-    #def testSay(self):
-        #self.assertResponse("say hi", "Hi!")
+    def testSay(self):
+        self.assertResponse('say hi', 'Hi!', to="#test", usePrefixChar=False)
+
+    def testFactoid(self):
+        self.feedMsg('cats are smart', to=self.irc.nick)
+        self.assertRegexp(' ', '.*(cats|Okay).*', to="#test")
+        self.feedMsg('cats', to=self.irc.nick)        
+        self.assertResponse(' ', 'cats are smart', to="#test", usePrefixChar=False)
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:

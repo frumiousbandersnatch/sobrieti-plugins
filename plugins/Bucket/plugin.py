@@ -28,10 +28,14 @@
 
 ###
 
+import sys
+def chirp(*msgs):
+    sys.stderr.write(' '.join([repr(m) for m in msgs]) + '\n')
+
 import re
 from importlib import reload
-from . import store
-reload(store)
+from . import bucket
+reload(bucket)
 
 import supybot.ircmsgs as ircmsgs
 from supybot import utils, plugins, ircutils, callbacks
@@ -57,8 +61,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     threaded = True
     public = True
     regexps = []
-    addressedRegexps = ["factoid", "explain"]
-    unaddressedRegexps = ["say", "items1", "items2"]
+    addressedRegexps = ["factoid", "explain", "matchlike", "junk_addr"]
+    unaddressedRegexps = ["say", "items1", "items2", "junk_unaddr"]
 
     def invalidCommand(self, irc, msg, tokens):
         s = ' '.join(tokens)
@@ -72,13 +76,22 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         plugins.ChannelDBHandler.__init__(self)
 
     def makeDb(self, filename):
-        return store.Bucket(filename)
+        chirp(f"MAKEDB: {filename}")
+        return bucket.store.Bucket(filename)
 
     def say(self, irc, msg, regex):
         r"^say (?P<sentence>.*$)"
         text = regex["sentence"]
         text = text.capitalize() + "!"
+        chirp(f'say: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}| -> |{text}|')
+        self.log.debug(f'say: msg:|{msg}|, regex:|{regex}| -> |{text}|')
         irc.reply(text, prefixNick=False)
+
+    def give(self, irc, msg, args, channel, item):
+        """[<channel>] <item>
+
+        Gimme something
+        """
 
     def inventory(self, irc, msg, args, channel):
         """[<channel>]
@@ -98,7 +111,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         """
         db = self.getDb(channel)
         lines = []
-        for fid, (s,l,t) in sorted(db.facts(subject).items()):
+        for fid, (s,l,t) in sorted(db.factoids(subject).items()):
             if l not in ("is","are"):
                 l = f'<{l}>'
             lines.append(f'(#{fid}) {l} {t}')
@@ -123,16 +136,16 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
         have = db.held_items()
         if item in have:
-            _,_,reply = db.choose_fact("duplicate item")            
+            _,_,reply = db.choose_factoid("duplicate item")            
             reply = db.resolve(reply, **more)
             irc.reply(reply, prefixNick=False, action=False)
             return
 
         max_items = self.registryValue('max_items')
         if len(have) >= max_items:
-            _,_,reply = db.choose_fact("pickup full")
+            _,_,reply = db.choose_factoid("pickup full")
         else:
-            _,_,reply = db.choose_fact("takes item")
+            _,_,reply = db.choose_factoid("takes item")
 
         reply = db.resolve(reply, **more)
 
@@ -154,13 +167,14 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         r"^\x01ACTION gives (?P<nick>[^ ]+) (?P<item>.+?)\x01$"
         self._itemsx(irc, msg, regex)
 
-    def junk(self, irc, msg, regex):
+    def junk_addr(self, irc, msg, regex):
         r".*"
-        print("junk:")
-        print(f'msg:|{msg}|')
-        print(f'|{repr(msg.args[1])}|')
-        if regex:
-            print(regex, regex.groups())
+        chirp(f'ADDRESSED: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}|')
+        self.log.debug(f'addressed: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}|')
+    def junk_unaddr(self, irc, msg, regex):
+        r"^(?!say).*"
+        chirp(f'UNADDRESSED: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}|')
+        self.log.debug(f'unaddressed: msg:|{msg}|, regex:|{regex}|')
 
     def factoid(self, irc, msg, regex):
         r"^(?P<subject>.*) +(?P<link>is|are|[<][^>]+[>]) +(?P<tidbit>.*)$"
@@ -186,33 +200,73 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             rep_sub = "new fact"
         else:
             rep_sub = "existing fact"
-        _,_,reply = db.choose_fact(rep_sub)
-        self.log.debug(f'factoid: {rep_sub}: "{reply}" {more}')
+        _,_,reply = db.choose_factoid(rep_sub)
+        self.log.debug(f'factoid: |{subject}|{link}|{tidbit}| -> |{reply}|')
         reply = db.resolve(reply, **more)
+        chirp(f'factoid: |{subject}|{link}|{tidbit}| -> |{reply}|')
         irc.reply(reply, prefixNick=False, action=False)        
-        
 
-    def explain(self, irc, msg, regex):
-        r"^(?P<subject>((?!\s*is|are|[<][^>]+[>]).)*)$"
+    def _factoid_response(self, irc, msg, factoid, **more):
+        '''
+        Respond with a factoid
+        '''
         chan = msg.args[0]
         db = self.getDb(chan)
-        subject = regex['subject']
-        _,link,tidbit = db.choose_fact(subject)
-
-        self.log.debug(f'explain: "{subject}" "{link}" "{tidbit}"')
 
         # fixme: $someone, etc
-        more = dict(who=msg.nick, to=irc.nick)
+        more.update(who=msg.nick, to=irc.nick)
+        subject, link, tidbit = factoid
         tidbit = db.resolve(tidbit, **more)            
         if link == 'reply':
+            chirp(f'REPLY: |{tidbit}|')
             irc.reply(tidbit, prefixNick=False)
             return
         if link == 'action':
+            chirp(f'ACTION: |{tidbit}|')
             irc.reply(tidbit, action=True)
             return
         reply = ' '.join([subject, link, tidbit])
+        chirp(f'RESPONSE: |{reply}|')
         irc.reply(reply)
+
+    def _dont_know(self, irc, msg, **more):
+        '''
+        Shruggy shoulder
+        '''
+        chan = msg.args[0]
+        db = self.getDb(chan)
+        _,_,reply = db.choose_factoid("don't know")
+        chirp(f'DO NOT KNOW: |{reply}|')
+        irc.reply(reply)
+
+    def explain(self, irc, msg, regex):
+        r"^(?P<subject>((?!\s*is|are|[<][^>]+[>]).)*)$"
+        chirp(f'EXPLAIN: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}|')
+        self.log.debug(f'explain: msg:|{msg}|, regex:|{regex}|')
+        chan = msg.args[0]
+        db = self.getDb(chan)
+        subject = regex['subject']
+        try:
+            _,link,tidbit = db.choose_factoid(subject)
+        except KeyError:
+            self._dont_know(irc, msg)
+            return
+        self._factoid_response(irc, msg, (subject, link, tidbit))
+
+    def matchlike(self, irc, msg, regex):
+        r"^(?P<subject>(?!\s*=!.)*) =~ (?P<match>.*)$"
+        chan = msg.args[0]
+        db = self.getDb(chan)
+        subject = regex['subject']
+        parts = regex['match'].split("/")
         
+        if len(parts) == 1:
+            _,link,tidbit = db.choose_factoid_like(subject, parts[0])
+            self._factoid_response(irc, msg, (subject, link, tidbit))
+            return
+        # for now, no support for edit
+            
+            
 
 Class = Bucket
 

@@ -54,7 +54,7 @@ The bot is split into:
 
 - plugin :: handles interfacing to supybot/limnoria IRC
 - store :: interface to DB and basic functionality semantics but free from IRC
-- prime :: some initial canned data that may be loaded into the DB
+- prime :: some "system" facts and DB initialization
 - dumpload :: utility to convert from XKCD Bucket MySQL DB to sqlite3 used by this bot
 
 ** Plugin
@@ -87,7 +87,7 @@ supybot commands
 
 ** Store
 
-- [X] schema init
+- [X] schema init with triggers
 - [X] singular idempotent term definition and id return
 - [X] id->term lookup
 - [X] term lookups by kind
@@ -98,8 +98,10 @@ supybot commands
 - [X] singular idempotent factoid defintion and id return
 - [X] variables (word class, user name, object, number)
 - [X] variable interpolation
-- [ ] factoid deletion
-- [ ] factoid editing
+- [X] item deletion
+- [X] factoid deletion
+- [ ] factoid tidbit editing
+- [ ] factoid tidbit selection
 
 ** Prime
 

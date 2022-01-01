@@ -27,8 +27,8 @@ def _load_cats_and_dogs(bs):
     bs.factoid("cats", "are", "smart")
     bs.factoid("cats", "are", "stupid")
     bs.factoid("dogs", "are", "stupid")
-    cats = bs.facts("cats")
-    dogs = bs.facts("dogs")
+    cats = bs.factoids("cats")
+    dogs = bs.factoids("dogs")
     print("create", cats, dogs)
     assert len(cats) == 2
     assert len(dogs) == 1
@@ -52,16 +52,16 @@ def test_purge_factoid():
         print(bs.sql("select * from terms where id = ?", (one[2],)).fetchone())
 
     bs.purge_factoid("cats", "are", "stupid")
-    cats = bs.facts("cats")
-    dogs = bs.facts("dogs")
+    cats = bs.factoids("cats")
+    dogs = bs.factoids("dogs")
     print("purge stupid cats", cats, dogs)
     assert len(cats) == 1
     assert len(dogs) == 1
 
 
     bs.purge_factoid("dogs", "are", "stupid")
-    cats = bs.facts("cats")
-    dogs = bs.facts("dogs")
+    cats = bs.factoids("cats")
+    dogs = bs.factoids("dogs")
     print("purge stupid dogs", cats, dogs)
     assert len(cats) == 1
     assert len(dogs) == 0
@@ -74,8 +74,8 @@ def test_purge_factoid():
     bs.purge_factoid("cats", "are", "smart")
     assert not bs.sql("SELECT * FROM terms WHERE text = 'smart'").fetchall()
     # smart term should be removed via trigger
-    cats = bs.facts("cats")
-    dogs = bs.facts("dogs")
+    cats = bs.factoids("cats")
+    dogs = bs.factoids("dogs")
     print("purge smart cats", cats, dogs)
     assert len(cats) == 0
     assert len(dogs) == 0
@@ -84,11 +84,19 @@ def test_purge_fact_subject():
     bs = store.Bucket()
     _load_cats_and_dogs(bs)
     bs.purge_subject("cats")
-    cats = bs.facts("cats")
-    dogs = bs.facts("dogs")
+    cats = bs.factoids("cats")
+    dogs = bs.factoids("dogs")
     print("purge cats", cats, dogs)
     assert len(cats) == 0
     assert len(dogs) == 1
     assert not bs.sql("SELECT * FROM terms WHERE text = 'smart'").fetchall()
     assert bs.sql("SELECT * FROM terms WHERE text = 'stupid'").fetchall()
+    
+def test_choose_factoid():
+    bs = store.Bucket()
+    _load_cats_and_dogs(bs)
+    s,l,t = bs.choose_factoid("dogs")
+    assert t == "stupid"
+    s,l,t = bs.choose_factoid_like("cats", "mar")
+    assert t == "smart"
     
