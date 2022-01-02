@@ -5,7 +5,7 @@ Dump from XKCD Bucket MySQL and/or load to Pail sqlite3
 >>> pip install mysql-connector-python
 '''
 import mysql.connector
-import store
+from . import store
 
 def fix_enc(text, encoding='latin1'):
     'Fix encoding.'
@@ -76,10 +76,10 @@ def convert_facts(mconn, bs):
     bs.db.commit()
     return count
 
-def main(dbfile=":memory:", host="localhost", user="bucket",
+def main(bs, host="localhost", user="bucket",
          password="bucket", database="bucket"):
 
-    bs = store.Bucket(dbfile)
+
     with mysql.connector.connect(host=host, user=user,
                                  password=password, database=database) as mconn:
         n = convert_items(mconn, bs)
@@ -95,7 +95,8 @@ if '__main__' == __name__:
         dbfile = sys.argv[1]
     except IndexError:
         dbfile = ":memory:"
-    main(dbfile)
+    bs = store.Bucket(dbfile)
+    main(bs)
     print(f'loaded to {dbfile}')
 
     

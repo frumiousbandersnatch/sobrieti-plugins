@@ -99,11 +99,12 @@ class Bucket:
         got = cur.execute("SELECT kind,text FROM terms WHERE id=?", (tid,))
         return got.fetchone()
 
-    def term(self, text, kind, commit=True):
+    def term(self, text, kind, commit=True, creator=""):
         '''
         Return term ID, creating it if novel.
 
-        Per term commit is slow.  Batch terms then commit once is fast.
+        Pass commit=False to batch up calls and do a single explicit
+        commit for much greater speed. 
         '''
         cur = self.db.cursor()
         got = cur.execute("SELECT id FROM terms WHERE kind=? AND text=?",
@@ -112,8 +113,9 @@ class Bucket:
             #print ("OLD TERM ID:",got[0])
             return got[0]
 
-        cur.execute("INSERT INTO terms(kind,text) VALUES(?,?)",
-                    (kind, text))
+        cur.execute("""
+        INSERT INTO terms(kind,text,created_by) VALUES(?,?,?)""",
+                    (kind, text, creator))
         if commit:
             self.db.commit()
         tid = cur.lastrowid
@@ -148,7 +150,7 @@ class Bucket:
 
         Others are from irc (who, to, op, someone).
         '''
-        return set("held give take who someone to op".split())
+        return set("subject link factoid item held give take who someone to op".split())
 
     def known_kinds(self):
         '''
@@ -221,14 +223,14 @@ class Bucket:
     ### Fact interface.
     # The label "factoid" implies a triplet: (subject, link, tidbit)
 
-    def factoid(self, subject, link, tidbit, commit=True):
+    def factoid(self, subject, link, tidbit, commit=True, creator=""):
         '''
         Return pair (int, bool) giving factoid ID and if it was
         created anew.
         '''
-        sid = self.term(subject, "subject", commit)
-        lid = self.term(link, "link", commit)
-        tid = self.term(tidbit, "tidbit", commit)
+        sid = self.term(subject, "subject", commit, creator)
+        lid = self.term(link, "link", commit, creator)
+        tid = self.term(tidbit, "tidbit", commit, creator)
 
         cur = self.db.cursor()
         got = cur.execute("""SELECT id FROM facts 
@@ -236,11 +238,20 @@ class Bucket:
                           (sid, lid, tid)).fetchone()
         if got:
             return (got[0], False)
-        cur.execute("""INSERT INTO facts(subject_id, link_id, tidbit_id)
-        VALUES(?,?,?)""", (sid, lid, tid))
+        cur.execute("""
+        INSERT INTO facts(subject_id, link_id, tidbit_id, created_by)
+        VALUES(?,?,?,?)""", (sid, lid, tid, creator))
         if commit:
             self.db.commit()
         return (cur.lastrowid, True)
+
+    def is_system_fact(self, subject):
+        '''
+        Return if subject is for a system factoid
+        '''
+        if not isinstance(subject, str):
+            subject = subject[0] # if a factoid
+        return subject in prime.system_facts
 
     def purge_subject(self, subject):
         '''
@@ -325,22 +336,15 @@ class Bucket:
             ret[one[0]] = tuple([subject, one[1], one[2]])
         return ret
 
-    def render_factoid(self, factoid, **more):
-        '''
-        Given a fact (subject,link,tidbit) render to string
-        '''
-        slt = list(factoid)
-        slt[-1] = self.resolve(slt[-1])
-        return ' '.join(slt, **more)
 
     ### Items interface.  The store may "hold" a number of items and
     ### any item ever held is remembered.
 
-    def give_item(self, item):
+    def give_item(self, item, creator=""):
         '''
         Give an item to hold, return ID.
         '''
-        iid = self.term(item, "item")
+        iid = self.term(item, "item", creator=creator)
         cur = self.db.cursor()
         cur.execute("INSERT OR IGNORE INTO holding(item_id) VALUES(?)", (iid,))
         self.db.commit()

@@ -12,6 +12,13 @@ import sqlite3
 # provided, as indicated in comments.
 system_facts = {
 
+    "factoid-locked": [
+        ("reply", "Sorry $who, you need $thecapability capability to edit $thesubject"),
+    ],
+    "factoid-broken": [
+        ("reply", "Hmm, that looks weird"),
+    ],
+
     # Meta factoids about factoids.  The special term: $thesubject,
     # the value of the current factoid under consideration.  Except
     # for factoid-unknown, two others, $thelinke and $thetidbit are
@@ -46,6 +53,9 @@ system_facts = {
     # Non-item terms.  The special $thekind and $thetext are defined
     # and refer to the particular term kind and its text.
 
+    "term-locked": [
+        ("reply", "Sorry $who, you need $thecapability to edit $thekind"),
+    ],
     "term-duplicated": [
         ("reply", '$who: I had it that way!'),
         ("reply", "But $thekind is already set with $thetext!"),
@@ -61,10 +71,6 @@ system_facts = {
     "term-unknown": [
         ("reply", '$who: never heard of it!'),
         ("action", "sees no $thekind $thetext"),
-    ],
-    "term-reserved": [
-        ("reply", 'Sorry $who, "$thekind" terms are only for me!'),
-        ("action", 'covets precious "$thekind" terms'),
     ],
 
     # items:
@@ -137,26 +143,30 @@ def init(dbname):
 
     cur.execute("PRAGMA foreign_keys = ON")
     
-    # A term is text of a certain kind.  The kind is a free-form
-    # word but some are reserved.  An "item" kind is something the
-    # bot holds or has held, a factoid is a triplet of a
-    # "subject", a "link" and a "tidbit" kind.  Other kinds are
-    # used to allow mad lib substitution in text
+    # A term is text of a certain kind.  Some kinds are special (item,
+    # subject, link, tidibit).  Other kinds are used to allow mad lib
+    # substitution in text.  
 
     cur.execute("""
 CREATE TABLE IF NOT EXISTS terms (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-kind TEXT NOT NULL,
-text TEXT NOT NULL,
+id          INTEGER PRIMARY KEY AUTOINCREMENT,
+kind        TEXT NOT NULL,
+text        TEXT NOT NULL,
+created_by  TEXT NOT NULL DEFAULT "",
+created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 UNIQUE(kind, text))""")
 
-    # facts are association of three terms
+    # A fact is the association of three terms of kind subject, link
+    # and titbit. 
+
     cur.execute("""
 CREATE TABLE IF NOT EXISTS facts (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
+id         INTEGER PRIMARY KEY AUTOINCREMENT,
 subject_id INTEGER NOT NULL,
-link_id INTEGER NOT NULL,
-tidbit_id INTEGER NOT NULL,
+link_id    INTEGER NOT NULL,
+tidbit_id  INTEGER NOT NULL,
+created_by TEXT NOT NULL DEFAULT "",
+created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 FOREIGN KEY(subject_id) REFERENCES terms(id),
 FOREIGN KEY(link_id) REFERENCES terms(id),
 FOREIGN KEY(tidbit_id) REFERENCES terms(id),

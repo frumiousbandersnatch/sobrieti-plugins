@@ -54,4 +54,5 @@ class BucketTestCase(ChannelPluginTestCase):
         self.assertRegexp('give an orange cat', '.*', to=self.channel)
 
 
+
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:

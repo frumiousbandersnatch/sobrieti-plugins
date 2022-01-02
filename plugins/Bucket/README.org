@@ -1,16 +1,136 @@
-#+title: Mostly compatible implementation of XKCD Bucket
+#+title: A somewhat compatible implementation of XKCD Bucket
 
 * Goals
 
-- Provide a supybot plugin that acts similar to XKCD Bucket as documented [[http://sobrieti.bot.nu/pail/][here]].
+- Provide a supybot/limnoria plugin that acts similar to XKCD Bucket as documented [[http://sobrieti.bot.nu/pail/][here]].
 - Use SQLite3 instead of MySQL
 - Provide a converter from Bucket's MySQL schema to our SQLite3 schema
 
 Why? Because I am sick of dealing with Perl and MySQL for ~pail~ on snoonet.
 
+What does "compatible" mean? 
+
+- Support the commands most used for defining factoids and giving times.
+- Keep the "magic" variables (here called terms) with side effects.
+- Keep (and increase) responses themselves driven by stored factoids.
+- Keep some of the behavior (~say~, ~bad-ass~)
+
+What does "somewhat" mean?
+
+- A new DB schema is adopted which removes some underutilized things
+  (like mostly unused dichotomy between ~name~ and ~type~ of ~bucket_vars~).
+  A converter is provided but it's somewhat lossy.
+
+- No attempt to retain as-is the "user commands" besides those
+  described above (factoid/item definitions).  Similar ones are
+  provided which reflect the different schema taxonomy and limnoria
+  norms.
+
 * User Manual
 
-t.b.d
+** Terms
+
+The Bucket mostly contains simple information called /terms/.  A term is
+some /text/ of a /kind/.  There can be many terms of a given kind.  Users
+are free to add new kinds and new values for existing kinds, though
+some kinds of terms are reserved for system use and special
+permissions are needed to modify them.
+
+The /text/ of a term may reference a kind of term by including ~$kind~.
+For example, 
+
+#+begin_example
+I like $someone's $pet
+#+end_example
+
+If the Bucket uses this text in a reply then ~$someone~ will be replaced
+with the nick of a recently active user and ~$pet~ will be replaced with
+one of the /text/ from a term of /kind/ "pet".  The ~$someone~ is one of the
+special system terms but ~$pet~ is one that can be created and added to
+by anyone.
+
+** Items
+
+The Bucket is is bottomless in that it contains all it has been given.
+But, it also "holds" certain things special.  These are called
+"items" and are terms of the special ~item~ kind.
+
+We may give the Bucket an item
+
+#+begin_example
+/me gives bucket a horse
+#+end_example
+
+And we may ask what items the Bucket holds
+
+#+begin_example
+bucket, inventory
+<bucket> I have a horse.
+#+end_example
+
+And the Bucket may be generous if asked
+
+#+begin_example
+<me> bucket, give me a present
+*bucket gives me a horse
+#+end_example
+
+The Bucket can only hold so many items and will drop one if given
+another when full.  The Bucket can also be empty of held items.
+Besides explicitly giving and receiving items, special system terms
+can may used which have side effects on what the Bucket holds.
+
+- ~$held~ :: resolves to a random held item (no side effect)
+
+- ~$take~ :: resolves to a random item held in the past and as a side
+  effect causes Bucket to now hold it again.
+
+- ~$give~ :: resolves to a random held item and as a side effect causes
+  Bucket to no longer hold it.
+
+** Factoids
+
+The other special terms that the Bucket may hold build up "factoids".
+We may make a factoid like:
+
+#+begin_example
+<me> bucket, the moon is made of green cheese
+#+end_example
+
+A factoid is a relationship built from three special kinds of terms, a
+~subject~ (~the moon~) a ~link~ (~is~) and a ~tidibit~ (~make of green cheese~).
+The verbs "is" and "are" are specially identified as links and any
+other links may be given as ~<link>~ such as:
+
+#+begin_example
+<me> bucket, cats <run> circles around dogs
+#+end_example
+
+A link is generally considered a verb.  Two special links are:
+
+- ~<reply>~ :: When the factoid is triggered the Bucket replies with just the "tidbit".
+- ~<action>~ :: Like ~<reply>~ but the Bucket responds with an action
+
+
+* Operator manual
+
+
+** Capabilities
+
+In addition to usual command capabilities, the Bucket will respect
+these capabilities to limit operations at content level:
+
+- ~system~ :: May ~add~ or ~remove~ any (including system) factoids and
+  terms.  System factoids need not be changed frequently and must
+  follow certain rules as to their content and some expertise is
+  needed.
+
+- ~op~ :: May ~remove~ (non-system) factoids or force dropping of a
+  specific item.  This may be exercised, for example, to remove
+  factoids that are contrary to channel policy.
+
+
+
 
 * Differences from XKCD Bucket
 
