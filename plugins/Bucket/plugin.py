@@ -82,16 +82,11 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     def say(self, irc, msg, regex):
         r"^say (?P<sentence>.*$)"
         text = regex["sentence"]
+        # fixme: strip off non-word chars from text
         text = text.capitalize() + "!"
         chirp(f'say: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}| -> |{text}|')
         self.log.debug(f'say: msg:|{msg}|, regex:|{regex}| -> |{text}|')
         irc.reply(text, prefixNick=False)
-
-    def give(self, irc, msg, args, channel, item):
-        """[<channel>] <item>
-
-        Gimme something
-        """
 
     def inventory(self, irc, msg, args, channel):
         """[<channel>]
@@ -100,8 +95,17 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         """
         db = self.getDb(channel)
         have = db.held_items()
+        if not have:
+            more = dict(who=msg.nick, to=irc.nick)
+            reply = db.choose_factoid("empty bucket")            
+            chirp(f"INVENTORY: {reply}")
+            self._factoid_response(irc, msg, reply)
+            return
+            
         have = ', '.join(have)
-        irc.reply(f'is carrying {have}.', prefixNick=False, action=True)
+        reply = f'is carrying {have}.'
+        chirp(f"INVENTORY: {reply}")
+        irc.reply(reply, prefixNick=False, action=True)
     inventory = wrap(inventory, ['channeldb'])
 
     def literal(self, irc, msg, args, channel, subject):
@@ -109,6 +113,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
         All that is known about a subject.
         """
+        chirp(f"LITERAL: {subject}")
         db = self.getDb(channel)
         lines = []
         for fid, (s,l,t) in sorted(db.factoids(subject).items()):
@@ -117,8 +122,17 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             lines.append(f'(#{fid}) {l} {t}')
         body = '|'.join(lines)
         reply = f'{subject} {body}'
+        chirp(f"LITERAL: {reply}")
         irc.reply(reply)
     literal = wrap(literal, ['channeldb', 'text'])
+
+    def give(self, irc, msg, args, channel, item):
+        """[<channel>] <item>
+
+        Gimme something!
+        """
+        self._itemsx(irc, msg, dict(nick=irc.nick, item=item))
+    give = wrap(give, ['channeldb', 'text'])
 
     ### Common for items1/items2 because I do not know how to combine
     ### all three regexp into one....
@@ -138,6 +152,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         if item in have:
             _,_,reply = db.choose_factoid("duplicate item")            
             reply = db.resolve(reply, **more)
+            chirp(f"ITEMSX: have: {reply}")
             irc.reply(reply, prefixNick=False, action=False)
             return
 
@@ -153,6 +168,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         # one and we don't want to drop the one we were just given.
         db.give_item(item)
 
+        chirp(f"ITEMSX: {reply}")
         irc.reply(reply, prefixNick=False, action=False)
         return
 

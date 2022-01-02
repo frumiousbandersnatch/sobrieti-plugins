@@ -37,14 +37,15 @@ system_facts = {
         ("reply", "Yes, I know"),
     ],
 
+
+    # items:
+
     "duplicate item": [
         ("reply", '$who: I already have $item.'),
         ("reply", "But I've already got $item!"),
         ("reply", 'I already have $item.'),
         ("reply", "No thanks, $who, I've already got one."),
     ],
-
-    # actions
     "drops item": [
         ("action", "fumbles and drops $give."),
     ],
@@ -52,6 +53,10 @@ system_facts = {
         ("action", "drops $give and takes $item."),
         ("action", "hands $who $give in exchange for $item"),
         ("action", "is now carrying $item, but dropped $give."),
+    ],
+    "empty bucket": [
+        ("reply", "Sorry, $who, I'm not carrying anything!"),
+        ("action", "hunts under the cushions for something to give $who"),
     ],
     "takes item": [
         ("action", "is now carrying $item."),

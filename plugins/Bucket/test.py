@@ -38,8 +38,20 @@ class BucketTestCase(ChannelPluginTestCase):
 
     def testFactoid(self):
         self.feedMsg('cats are smart', to=self.irc.nick)
-        self.assertRegexp(' ', '.*(cats|Okay).*', to="#test")
+        self.assertRegexp(' ', '.*(cats|Okay).*', to=self.channel)
         self.feedMsg('cats', to=self.irc.nick)        
-        self.assertResponse(' ', 'cats are smart', to="#test", usePrefixChar=False)
+        self.assertResponse(' ', 'cats are smart', to=self.channel, usePrefixChar=False)
+
+    def testLiteral(self):
+        self.assertRegex('literal cats', '.*cats.*')
+
+    def testItems(self):
+        self.assertRegexp('inventory', '.*')
+        m = ircmsgs.action(self.channel, f'gives {self.irc.nick} a brown cat')
+        self.irc.feedMsg(m)
+        self.assertRegexp(' ', '.*', to=self.channel)
+        self.assertRegexp('inventory', '.*a brown cat.*')
+        self.assertRegexp('give an orange cat', '.*', to=self.channel)
+
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:

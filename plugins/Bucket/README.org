@@ -74,6 +74,7 @@ supybot commands
 - [ ] use auth capabilities to allow change to "system" fact subjects
 - [ ] single way to prepare =more= parameters (~$who~, ~$someone~)
 - [X] regex based "give items"
+- [X] command: ~give~ 
 - [X] command: ~inventory~
 - [X] regex ~is~ / ~are~ fact definition
 - [X] regex ~<reply>~ / ~<action>~ fact definition
@@ -84,6 +85,7 @@ supybot commands
 - [ ] command: ~undo last~ factoid
 - [ ] command: remember quote (requires keeping recent history)
 - [ ] gender
+- [ ] ~go away~ / ~come back~
 
 ** Store
 
