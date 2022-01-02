@@ -5,8 +5,18 @@ Prime a bucket with some entries
 
 import sqlite3
 
+# System facts are used sort of like locale gettext.  The plugin code
+# only knows about the subject keys and will resolve a tidibit to form
+# a response.  In addition to system terms, known terms can contribute
+# to the resolution.  Some system factoids have special terms
+# provided, as indicated in comments.
 system_facts = {
-    "don't know": [
+
+    # Meta factoids about factoids.  The special term: $thesubject,
+    # the value of the current factoid under consideration.  Except
+    # for factoid-unknown, two others, $thelinke and $thetidbit are
+    # available.
+    "factoid-unknown": [
         ("reply", "A thousand apologies, effendi, but I do not understand."),
         ("reply", "Beeeeeeeeeeeeep!"),
         ("reply", "Can't talk, zombies!"),
@@ -18,62 +28,100 @@ system_facts = {
         ("reply", "I'm sorry, there's currently nothing associated with that keyphrase."),
         ("reply", "Not a bloody clue, sir."),
         ("reply", "UNCAUGHT EXCEPTION: TERMINATING"),
+        ("reply", "Sorry $who, I can't do that right now"),
         ("action", "dumps core"),
     ],
-    "band name reply": [
-        ("reply", '"$band" would be a good name for a band.'),
-        ("reply", '"$band" would be a nice name for a band.'),
-        ("reply", '"$band" would be a nice name for a rock band.'),
-        ("reply", '"$band" would make a good name for a band.'),
-        ("reply", '"$band" would make a good name for a rock band.'),
-        ("reply", 'That would be a good name for a band.'),
-    ],
-    "new fact": [
+    "factoid-added": [
         ("reply", 'Okay, $who.'),
-        ("reply", 'I am excited to learn about $subject!'),
+        ("reply", 'I am excited to learn about $thesubject!'),
+        ("reply", 'Well now! Who knew that $thesubject $thelink $thetidbit?'),
     ],
-    "existing fact": [
+    "factoid-duplicated": [
         ("reply", "$who, I already had it that way"),
+        ("reply", "$who, I already that for $thesubject"),
         ("reply", "Yes, I know"),
+        ("reply", "Don't teach grandma to suck eggs!"),
     ],
 
+    # Non-item terms.  The special $thekind and $thetext are defined
+    # and refer to the particular term kind and its text.
+
+    "term-duplicated": [
+        ("reply", '$who: I had it that way!'),
+        ("reply", "But $thekind is already set with $thetext!"),
+    ],
+    "term-added": [
+        ("reply", 'Okay $who'),
+        ("action", "places $thetext on the growing $thekind mound"),
+    ],
+    "term-removed": [
+        ("reply", 'Okay $who'),
+        ("action", "kicks $thetext from the $thekind pool"),
+    ],
+    "term-unknown": [
+        ("reply", '$who: never heard of it!'),
+        ("action", "sees no $thekind $thetext"),
+    ],
+    "term-reserved": [
+        ("reply", 'Sorry $who, "$thekind" terms are only for me!'),
+        ("action", 'covets precious "$thekind" terms'),
+    ],
 
     # items:
 
-    "duplicate item": [
-        ("reply", '$who: I already have $item.'),
-        ("reply", "But I've already got $item!"),
-        ("reply", 'I already have $item.'),
+    # Give away an item.  The special $recipient is filled with the
+    # name of who receives the gift.  The gift itself must be refered
+    # to with $give which has a side effect to have the bot no longer
+    # hold the item.
+    "give-present": [
+        ("action", "gives $recipient $give"),
+        ("reply", "Hey, $recipient!  Here, for you: $give!"),
+    ],
+
+    # Item related handling. Where an item of interest exists $theitem
+    # is defined.  
+    "item-duplicated": [
+        ("reply", '$who: I already have $theitem.'),
+        ("reply", "But I've already got $theitem!"),
+        ("reply", 'I already have $theitem.'),
         ("reply", "No thanks, $who, I've already got one."),
     ],
-    "drops item": [
+    # A $give must be used.
+    "item-dropped": [
         ("action", "fumbles and drops $give."),
     ],
-    "pickup full": [
-        ("action", "drops $give and takes $item."),
-        ("action", "hands $who $give in exchange for $item"),
-        ("action", "is now carrying $item, but dropped $give."),
+    # A $give must be used.
+    "item-overflow": [
+        ("action", "drops $give and takes $theitem."),
+        ("action", "hands $who $give in exchange for $theitem"),
+        ("action", "is now carrying $theitem, but dropped $give."),
     ],
-    "empty bucket": [
+    # No $theitem.
+    "item-underflow": [
         ("reply", "Sorry, $who, I'm not carrying anything!"),
-        ("action", "hunts under the cushions for something to give $who"),
+        ("action", "hunts under the cushions for some new stuff"),
     ],
-    "takes item": [
-        ("action", "is now carrying $item."),
-        ("action", "now contains $item."),
+    "item-taken": [
+        ("action", "is now carrying $theitem."),
+        ("action", "now contains $theitem."),
         ("reply", "Okay, $who."),
     ],
-    "list items": [
+    # Special $inventory
+    "item-list": [
         ("action", "contains $inventory."),
         ("reply", "I am carrying $inventory."),
         ("action", "is carrying $inventory."),
     ],
+
+    # common conversations
+
     "I want a present": [
         ("action", "gives $who $give"),
     ],
     "give someone a present": [
         ("action", "gives $someone $give"),
     ],
+
     # "uses reply":[],
     # "automatic haiku":[],
 }

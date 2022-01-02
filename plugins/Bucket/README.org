@@ -108,7 +108,8 @@ supybot commands
 ** Prime
 
 - [X] default special replies
-- [ ] change these to "system" 
+- [X] change these to "system" 
+- [X] rationalize system factoid subject names
 
 ** Dump/load
 

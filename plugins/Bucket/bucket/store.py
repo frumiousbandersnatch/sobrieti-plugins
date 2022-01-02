@@ -45,7 +45,11 @@ class RandomHeld:
 
 class RandomGive:
     '''
-    A thing that acts like a random held item but will remove the chosen.
+    A thing that acts like a random held item but will remove the
+    chosen.
+
+    Note, there is no underflow protection.  If used when not holding
+    anything it will simply return the kind.
     '''
     def __init__(self, bs, kind='give'):
         self.bs = bs
@@ -62,6 +66,8 @@ class RandomGive:
 class RandomTake:
     '''
     A thing that acts like random old item but will add to inventory
+
+    Note this does not overflow protection.
     '''
     def __init__(self, bs, kind='take'):
         self.bs = bs
@@ -135,7 +141,14 @@ class Bucket:
         return got[0]       # singlets returned from db as (s,)
         
     def system_kinds(self):
-        return set("held give take".split())
+        '''
+        Return reserved system kinds of terms.
+
+        Some have side effects (held, give, take).
+
+        Others are from irc (who, to, op, someone).
+        '''
+        return set("held give take who someone to op".split())
 
     def known_kinds(self):
         '''
