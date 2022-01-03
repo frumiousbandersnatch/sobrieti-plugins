@@ -83,12 +83,15 @@ class RandomTake:
 class Bucket:
     'The dumbest smart container around'
 
+    system_nick = ":system:"
+
     def __init__(self, dbname=":memory:"):
         self.db = prime.init(dbname)
 
         for subject, lts in prime.system_facts.items():
             for link, tidbit in lts:
-                self.factoid(subject, link, tidbit, False)
+                self.factoid(subject, link, tidbit,
+                             commit=False, creator=self.system_nick)
         self.db.commit()
 
     def idterm(self, tid):
@@ -122,13 +125,15 @@ class Bucket:
         #print("NEW TERM ID:", tid)
         return tid
         
-    def terms(self, kind):
+    def terms(self, kind, return_ids=False):
         '''
         Return list of term texts of given kind
         '''
         cur = self.db.cursor()
-        got = cur.execute("SELECT text FROM terms WHERE kind=? ORDER BY id",
+        got = cur.execute("SELECT text,id FROM terms WHERE kind=? ORDER BY id",
                           (kind, )).fetchall()
+        if return_ids:
+            return got
         return [one[0] for one in got]
 
     def choose_term(self, kind):
@@ -223,6 +228,19 @@ class Bucket:
     ### Fact interface.
     # The label "factoid" implies a triplet: (subject, link, tidbit)
 
+    def idfactoid(self, fid):
+        '''
+        Return the factoid (subject,link,tidbit) for the factoid ID.
+        '''
+        return self.sql("""
+        SELECT subject.text, link.text, tidbit.text
+        FROM facts fact
+        LEFT JOIN terms subject ON subject.id = fact.subject_id
+        LEFT JOIN terms link    ON link.id    = fact.link_id
+        LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
+        WHERE fact.id=?""", (fid,)).fetchone()
+
+
     def factoid(self, subject, link, tidbit, commit=True, creator=""):
         '''
         Return pair (int, bool) giving factoid ID and if it was
@@ -247,11 +265,20 @@ class Bucket:
 
     def is_system_fact(self, subject):
         '''
-        Return if subject is for a system factoid
+        Return True if subject is for a system factoid, False if
+        subject exists and is non-system, None if subject does not
+        exist.
         '''
         if not isinstance(subject, str):
             subject = subject[0] # if a factoid
-        return subject in prime.system_facts
+
+        got = self.sql("""
+        SELECT created_by FROM terms 
+        WHERE kind='subject' AND text=?
+        """, (subject,))
+        if not got:
+            return None
+        return got.fetchone()[0] == self.system_nick
 
     def purge_subject(self, subject):
         '''
@@ -274,6 +301,45 @@ class Bucket:
           LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
           WHERE subject.text=? AND link.text=? AND tidbit.text=?
         )""", (subject, link, tidbit))
+
+    def recent_factoids(self, limit=10,
+                        return_facts=True, return_ids=True, creator=None):
+        '''
+        Return up to limit recent factoids, newest first.
+
+        If return both factoids return as [(id, (s,l,t)), ...].
+
+        If just ids, then [id, ...]
+
+        If just facts then [(s,l,t], ...]
+
+        The creator may name a creator or be '*' for all or None for
+        non-system.
+        '''
+        if not any((return_facts, return_ids)):
+            return 
+                    
+        if creator == "*":
+            extra = ""
+        elif creator is None:
+            extra = f"WHERE fact.created_by != '{self.system_nick}'"
+        else:
+            extra = f"WHERE fact.created_by = '{creator}'"
+
+        got = self.sql(f"""
+        SELECT fact.id, subject.text, link.text, tidbit.text
+        FROM facts fact
+        LEFT JOIN terms subject ON subject.id = fact.subject_id
+        LEFT JOIN terms link    ON link.id    = fact.link_id
+        LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
+        {extra}
+        ORDER BY fact.created_at DESC LIMIT ?""", (limit,))
+        if return_ids and return_facts:
+            return [(one[0], one[1:]) for one in got.fetchall()]
+        if return_ids:
+            return [one[0] for one in got.fetchall()]
+        return [one[1:] for one in got.fetchall()]
+
 
     def choose_factoid(self, subject=None):
         '''
@@ -377,16 +443,18 @@ class Bucket:
                     (item,))
         self.db.commit()
 
-    def held_items(self):
+    def held_items(self, return_ids=False):
         '''
         Return list of items currently held ordere oldest to newest.
         '''
         cur = self.db.cursor()
-        got = cur.execute("""SELECT text FROM terms
+        got = cur.execute("""SELECT terms.text,terms.id FROM terms
         INNER JOIN holding on terms.id = holding.item_id
         ORDER BY holding.id""")
         if not got:
             return []
+        if return_ids:
+            return got.fetchall()
         return [one[0] for one in got.fetchall()]
         
     def drop_item_at(self, item, index):

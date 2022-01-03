@@ -12,13 +12,6 @@ import sqlite3
 # provided, as indicated in comments.
 system_facts = {
 
-    "factoid-locked": [
-        ("reply", "Sorry $who, you need $thecapability capability to edit $thesubject"),
-    ],
-    "factoid-broken": [
-        ("reply", "Hmm, that looks weird"),
-    ],
-
     # Meta factoids about factoids.  The special term: $thesubject,
     # the value of the current factoid under consideration.  Except
     # for factoid-unknown, two others, $thelinke and $thetidbit are
@@ -31,12 +24,13 @@ system_facts = {
         ("reply", "Error at 0x08: Reference not found"),
         ("reply", "I cannot access that data."),
         ("reply", "I don't know"),
-        ("reply", "I don't know anything about that."),
+        ("reply", "I don't know anything about $thesubject."),
         ("reply", "I'm sorry, there's currently nothing associated with that keyphrase."),
         ("reply", "Not a bloody clue, sir."),
         ("reply", "UNCAUGHT EXCEPTION: TERMINATING"),
         ("reply", "Sorry $who, I can't do that right now"),
         ("action", "dumps core"),
+        ("action", "searches wikipedia for $thesubject")
     ],
     "factoid-added": [
         ("reply", 'Okay, $who.'),
@@ -49,6 +43,18 @@ system_facts = {
         ("reply", "Yes, I know"),
         ("reply", "Don't teach grandma to suck eggs!"),
     ],
+    "factoid-removed": [
+        ("reply", 'Okay $who.'),
+        ("action", "kicks $thetidbit from the $thesubject pool"),
+        ("reply", "That bad fact about $thesubject won't bother you any more"),
+    ],
+    "factoid-locked": [
+        ("reply", "Sorry $who, you need $thecapability capability to edit $thesubject"),
+    ],
+    "factoid-broken": [
+        ("reply", "Hmm, that looks weird"),
+    ],
+
 
     # Non-item terms.  The special $thekind and $thetext are defined
     # and refer to the particular term kind and its text.
@@ -70,7 +76,11 @@ system_facts = {
     ],
     "term-unknown": [
         ("reply", '$who: never heard of it!'),
-        ("action", "sees no $thekind $thetext"),
+        ("action", 'Nope, I see no "$thekind"'),
+    ],
+    # Special $inventory
+    "term-list": [
+        ("reply", "$thekind: $inventory."),
     ],
 
     # items:
@@ -92,9 +102,8 @@ system_facts = {
         ("reply", 'I already have $theitem.'),
         ("reply", "No thanks, $who, I've already got one."),
     ],
-    # A $give must be used.
     "item-dropped": [
-        ("action", "fumbles and drops $give."),
+        ("action", "fumbles and drops $theitem."),
     ],
     # A $give must be used.
     "item-overflow": [
@@ -117,6 +126,11 @@ system_facts = {
         ("action", "contains $inventory."),
         ("reply", "I am carrying $inventory."),
         ("action", "is carrying $inventory."),
+    ],
+    # no special term kinds
+    "item-unknown": [
+        ("reply", "$who: I don't got that!"),
+        ("action", 'pretends to drop a missing item'),
     ],
 
     # common conversations
@@ -167,6 +181,7 @@ link_id    INTEGER NOT NULL,
 tidbit_id  INTEGER NOT NULL,
 created_by TEXT NOT NULL DEFAULT "",
 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+is_system  BOOLEAN NOT NULL DEFAULT 0,
 FOREIGN KEY(subject_id) REFERENCES terms(id),
 FOREIGN KEY(link_id) REFERENCES terms(id),
 FOREIGN KEY(tidbit_id) REFERENCES terms(id),

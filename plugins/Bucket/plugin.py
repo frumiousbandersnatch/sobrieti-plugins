@@ -29,6 +29,8 @@
 ###
 
 import re
+import random
+from collections import defaultdict
 from importlib import reload
 from . import bucket
 reload(bucket)
@@ -37,6 +39,7 @@ import supybot.ircdb as ircdb
 import supybot.ircmsgs as ircmsgs
 from supybot import utils, plugins, ircutils, callbacks
 from supybot.commands import *
+import supybot.world as world
 try:
     from supybot.i18n import PluginInternationalization
     _ = PluginInternationalization('Bucket')
@@ -44,7 +47,6 @@ except ImportError:
     # Placeholder that allows to run the plugin on a bot
     # without the i18n module
     _ = lambda x: x
-
 
 # msg.nick is sender nick
 # msg.args[0] is channel
@@ -58,24 +60,64 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     threaded = True
     public = True
     regexps = []
-    addressedRegexps = ["re_factoid", "re_explain", "re_matchlike", "junk_addr"]
-    unaddressedRegexps = ["re_say", "re_items1", "re_items2", "junk_unaddr"]
-
-    def invalidCommand(self, irc, msg, tokens):
-        s = ' '.join(tokens)
-        for (r, name) in self.addressedRes:
-            self.log.info(f'Bucket: dispatch {name} {repr(r)} {repr(s)}')
-            for m in r.finditer(s):
-                self._callRegexp(name, irc, msg, m)
+    addressedRegexps = ["a_re_factoid", "a_re_explain", "a_re_matchlike", "junk_addr"]
+    unaddressedRegexps = ["un_re_say", "un_re_items1", "un_re_items2", "junk_unaddr"]
 
     def __init__(self, irc):
         callbacks.PluginRegexp.__init__(self, irc)
         plugins.ChannelDBHandler.__init__(self)
+        self.last_seen = defaultdict(list)
 
     def makeDb(self, filename):
         return bucket.store.Bucket(filename)
 
-    def re_say(self, irc, msg, regex):
+    def invalidCommand(self, irc, msg, tokens):
+        self.log.info(f'Bucket: invalidCommand(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, tokens:|{repr(tokens)}|)')
+
+        # fixme: check msg.args[1].startswith("@") but get "@" from config
+        # and simply return if found
+        
+        # fixme: call this block via super(), for now we chirp inside
+        s = ' '.join(tokens)
+        for (r, name) in self.addressedRes:
+            self.log.info(f'Bucket: dispatch addressed meth:|{name}| regex:|{repr(r)}| string:|{repr(s)}|')
+            for m in r.finditer(s):
+                self._callRegexp(name, irc, msg, m)
+
+        self.log.info(f'Bucket: invalidCommand: tags: {msg.tags}')
+        if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
+            return
+        self._reply(irc, msg, 'factoid-unknown', thesubject=msg.addressed)
+
+    def doPrivmsg(self, irc, msg):
+        if msg.channel:
+            ls = list(self.last_seen[msg.channel])
+            try:
+                ls.remove(msg.nick)
+            except ValueError:
+                pass
+            self.last_seen[msg.channel] = [msg.nick] + ls[:5]
+            # fixme,make that 5 configurable
+
+        callbacks.PluginRegexp.doPrivmsg(self, irc, msg)
+        if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
+            return
+
+        # fixme: use configured 
+        if msg.args[1].startswith('@'):
+            return
+
+        line = msg.args[1]
+        self.log.info(f'UNMATCHED1: str:|{line}| repr:|{repr(line)}|')
+        got = re.compile('\x01ACTION (?P<line>.*?)\x01').match(line)
+        if got:
+            line = got['line']
+            self.log.info(f'UNMATCHED2: str:|{line}| repr:|{repr(line)}|')
+        # OG bucket seems to not freely reply to "hi" but will to others.
+        self._reply(irc, msg, line, addressed=False)
+        
+
+    def un_re_say(self, irc, msg, regex):
         r"^say (?P<sentence>.*$)"
         text = regex["sentence"]
         # fixme: strip off non-word chars from text
@@ -91,12 +133,15 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         What items do the bucket hold?
         """
         db = self.getDb(channel)
-        have = db.held_items()
+        have = db.held_items(return_ids=True)
         if not have:
             self._reply(irc, msg, "item-underflow")
             return
-        have = ', '.join(have)
-        self._reply(irc, msg, "item-list", inventory=have)
+        lines = []
+        for one,iid in have:
+            lines.append(f'{iid}: {one}')
+        body = ' |'.join(lines)
+        self._reply(irc, msg, "item-list", inventory=body)
 
     @wrap(['channeldb', 'text'])
     def literal(self, irc, msg, args, channel, subject):
@@ -109,9 +154,10 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         for fid, (s,l,t) in sorted(db.factoids(subject).items()):
             if l not in ("is","are"):
                 l = f'<{l}>'
-            lines.append(f'(#{fid}) {l} {t}')
-        body = '|'.join(lines)
-        reply = f'{subject} {body}'
+            lines.append(f'{fid}: {l} {t}')
+        self.log.info(f'literal: "{subject}": {lines}')
+        body = ' |'.join(lines)
+        reply = f'{subject}: |{body}'
         irc.reply(reply)
         # fixme: use system-subject
 
@@ -122,7 +168,9 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         Tell me some kind of text.
         """
         db = self.getDb(channel)
-        if kind in db.system_kinds(): # fixme: use capabilities
+        creator = self._getUsername(msg)
+        if kind in db.system_kinds():
+            creator = db.system_nick
             cap_needed = 'system'
             if not self._isCapable(msg, cap_needed):
                 self._reply(irc, msg, "term-locked",
@@ -134,32 +182,101 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             rep_sub = "term-duplicated"
         else:
             rep_sub = "term-added"
-            db.term(text, kind, creator=self._getUsername(msg))
+            db.term(text, kind, creator=creator)
         self._reply(irc, msg, rep_sub, thekind=kind, thetext=text)
 
-    @wrap(['channeldb', 'something', 'text'])        
-    def remove(self, irc, msg, args, channel, kind, text):
-        """[<channel>] <kind> <text>
+    def _remove_term(self, irc, msg, db, ident):
+        kt = db.idterm(ident)
+        if not kt:
+            self._reply(irc, msg, 'term-unknown', thekind='', thetext='')
+            return
+        kind, text = kt
 
-        I can forget some kind of term value.
-        """
-        self.log.info(f'remove: {kind}: "{text}"')
-        db = self.getDb(channel)
-        if kind in db.system_kinds(): # fixme: use capabilities
-            self.log.info(f'remove: is system: {kind}')
+        if kind in db.system_kinds():
             cap_needed = 'system'
             if not self._isCapable(msg, cap_needed):
                 self._reply(irc, msg, "term-locked",
                             thekind=kind, thecapability=cap_needed)
                 return
 
-        have = db.terms(kind)
-        if text in have:
-            rep_sub = "term-removed"
-            db.purge_term(text, kind)
+        db.purge_term(text, kind)
+        self._reply(irc, msg, "term-removed", thekind=kind, thetext=text)
+
+    def _remove_factoid(self, irc, msg, db, ident, check_caps=True):
+        factoid = db.idfactoid(ident)
+        if not factoid:
+            self._reply(irc, msg, 'factoid-unknown')
+            return
+
+        # fixme: maybe let people remove w/out caps if they are creator
+        if check_caps:
+            if db.is_system_fact(factoid):
+                cap_needed = 'system'
+            else:
+                cap_needed = 'op'
+            if not self._isCapable(msg, cap_needed):
+                self._reply(irc, msg, "factoid-locked",
+                            thecapability=cap_needed, thesubject=factoid[0])
+                return
+
+        s,l,t = factoid
+        db.purge_factoid(s,l,t)
+        self._reply(irc, msg, "factoid-removed",
+                    thesubject=s, thelink=l, thetidbit=t)
+
+    @wrap(['channeldb', ('literal', ('term', 'factoid')), 'int'])
+    def remove(self, irc, msg, args, channel, which, ident):
+        """[<channel>] (term|factoid) <ID>
+
+        I can forget a term or a factoid but I need its ID number.
+        """
+        db = self.getDb(channel)
+        if which == "term":
+            self._remove_term(irc, msg, db, ident)
         else:
-            rep_sub = "term-unknown"
-        self._reply(irc, msg, rep_sub, thekind=kind, thetext=text)
+            self._remove_factoid(irc, msg, db, ident)
+        
+
+    @wrap(['channeldb', ('literal', ('recent', 'show', 'undo')), optional('int')])
+    def factoids(self, irc, msg, args, channel, cmd, ident):
+        """[<channel>] (recent|show|undo) [<ID>]
+
+        List or undo recent factoids or show a factoid.
+        """
+        self.log.info(f'FACTOIDS: cmd:|{repr(cmd)}| ident:|{repr(ident)}|')
+
+        db = self.getDb(channel)
+        if cmd == "show":
+            slt = db.idfactoid(int(ident))
+            if not slt:
+                self._reply(irc, msg, 'factoid-unknown', thesubject="that fact")
+                return
+            self._reply(irc, msg, slt)
+            return
+
+        # fixme make configurable, and make it time based
+        recent_n = 5
+
+        if cmd == "recent":
+            lf = db.recent_factoids(recent_n)
+            if not lf:
+                irc.reply("no recent factoids")
+                return
+            lines = []
+            for fid, slt in lf:
+                f = ' '.join(slt)
+                lines.append((f'{fid}: {f}'))
+            body = ' |'.join(lines)
+            irc.reply(f'recent factoid IDs: |{body}')
+            return
+
+        if cmd == "undo":
+            lf = db.recent_factoids(recent_n, return_facts=False)
+            check_caps = False
+            if ident not in lf: # old ones need permission to purge
+                check_caps = True
+            self._remove_factoid(irc, msg, db, ident, check_caps)
+            
 
     @wrap(['channeldb', 'text'])
     def terms(self, irc, msg, args, channel, kind):
@@ -168,8 +285,15 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         I can tell you all terms of a kind that I know.
         """
         db = self.getDb(channel)
-        values = '", "'.join(db.terms(kind))
-        irc.reply(f'{kind}: "{values}"')
+        have = db.terms(kind, return_ids=True)
+        if not have:
+            self._reply(irc, msg, 'term-unknown', thekind=kind)
+            return
+        lines = []
+        for one,tid in have:
+            lines.append(f'{tid}: {one}')
+        body = ' |'.join(lines)
+        self._reply(irc, msg, "term-list", thekind=kind, inventory=body)
         # fixme: use system-subject
 
     @wrap(['channeldb'])
@@ -192,6 +316,20 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         irc.reply(f'System kinds: "{system}"')
         irc.reply(f'User kinds: "{kinds}"')
         # fixme: use system-subject
+
+    @wrap(['channeldb', 'text'])
+    def drop(self, irc, msg, args, channel, ioid):
+        """[<channel>] <item_or_ID>
+
+        Sometimes I hold things I shouldn't, but I can let them go.
+        """
+        db = self.getDb(channel)
+        for text, iid in db.held_items(return_ids=True):
+            if text == ioid or str(iid) == ioid:
+                db.drop_item(text)
+                self._reply(irc, msg, 'item-dropped', theitem=text)
+                return
+        self._reply(irc, msg, 'item-unknown')
 
     @wrap(['channeldb', 'text'])
     def give(self, irc, msg, args, channel, text):
@@ -229,6 +367,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
         me = regex["nick"]
         if me != irc.nick:
+            self.log.info(f'itemsx: {me} is not {irc.nick}')
             return
 
         item = regex["item"]
@@ -238,7 +377,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
         have = db.held_items()
         if item in have:
-            self._reply(irc, msg, "item-duplicated", theitem=item)
+            self._reply(irc, msg, "item-duplicated",
+                        addressed=False, theitem=item)
             return
 
         max_items = self.registryValue('max_items')
@@ -246,7 +386,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             rep_sub = "item-overflow"
         else:
             rep_sub = "item-taken"
-        self._reply(irc, msg, rep_sub, theitem=item)
+        self._reply(irc, msg, rep_sub,
+                    addressed=False, theitem=item)
 
         # We must give item after reply resolution as an
         # 'item-overflow' factoid is expected to have a $give and we
@@ -256,25 +397,29 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
     # /me puts {item} in Bucket.
     # /me gives {item} to Bucket
-    def re_items1(self, irc, msg, regex):
+    def un_re_items1(self, irc, msg, regex):
         r"^\x01ACTION (?:gives|puts) (?P<item>.+?) (?:to|in) (?P<nick>[^ ]+?)\x01$"
         self.log.info(f"items1: {regex.groups()}")
         self._itemsx(irc, msg, regex)
 
     # /me gives Bucket {item}
-    def re_items2(self, irc, msg, regex):
+    def un_re_items2(self, irc, msg, regex):
         r"^\x01ACTION gives (?P<nick>[^ ]+) (?P<item>.+?)\x01$"
         self.log.info(f"items2: {regex.groups()}")
         self._itemsx(irc, msg, regex)
 
-    def re_factoid(self, irc, msg, regex):
+    # fixme, seek optional "bot, " or "bot: " prefix so when I forget
+    # and explicitly address the bot in PM it will do the right thing.
+    def a_re_factoid(self, irc, msg, regex):
         r"^(?P<subject>.*) +(?P<link>is|are|[<][^>]+[>]) +(?P<tidbit>.*)$"
         chan = msg.args[0]
         db = self.getDb(chan)
 
         subject = regex['subject']
+        creator = self._getUsername(msg)
         if db.is_system_fact(subject):
             self.log.info(f'factoid: is system: "{subject}"')
+            creator = db.system_nick
             cap_needed = 'system'
             if not self._isCapable(msg, cap_needed):
                 self._reply(irc, msg, "factoid-locked",
@@ -289,8 +434,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             self._reply(irc, msg, "factoid-broken")
             return
 
-        nick = self._getUsername(msg)
-        fid, new = db.factoid(subject, link, tidbit, creator=nick)
+
+        fid, new = db.factoid(subject, link, tidbit, creator=creator)
         if new:
             rep_sub = "factoid-added"
         else:
@@ -298,7 +443,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         self._reply(irc, msg, rep_sub, thesubject=subject, thelink=link, thetidbit=tidbit)
         return
 
-    def re_explain(self, irc, msg, regex):
+    def a_re_explain(self, irc, msg, regex):
         r"^(?P<subject>((?!\s*is|are|[<][^>]+[>]).)*)$"
         self.log.info(f'explain: msg:|{msg}|, regex:|{regex}|')
         chan = msg.args[0]
@@ -310,7 +455,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             reply = db.choose_factoid("factoid-unknown")
         self._reply(irc, msg, reply, thesubject=subject)
 
-    def re_matchlike(self, irc, msg, regex):
+    def a_re_matchlike(self, irc, msg, regex):
         r"^(?P<subject>(?!\s*=!.)*) =~ (?P<match>.*)$"
         chan = msg.args[0]
         db = self.getDb(chan)
@@ -330,14 +475,14 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     def junk_unaddr(self, irc, msg, regex):
         r"^(?!say).*"
         self.log.info(f'unaddressed: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}|')
-        m1 = re.compile(self.re_items1.__doc__).match(msg.args[1])
+        m1 = re.compile(self.un_re_items1.__doc__).match(msg.args[1])
         if m1:
             self.log.info(f"M1: {m1.groups()}")
-        m2 = re.compile(self.re_items2.__doc__).match(msg.args[1])
+        m2 = re.compile(self.un_re_items2.__doc__).match(msg.args[1])
         if m2:
             self.log.info(f"M2: {m2.groups()}")
 
-    def _reply(self, irc, msg, factoid, **more):
+    def _reply(self, irc, msg, factoid, addressed=True, **more):
         '''
         Respond with a factoid.
 
@@ -353,30 +498,38 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         chan = msg.args[0]
         db = self.getDb(chan)
 
-        if isinstance(factoid, str):
-            factoid = db.choose_factoid(factoid)
+        self.log.info(f'Bucket: _reply(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, factoid:|{repr(factoid)}|)')
 
-        # fixme: $someone, etc
+        if isinstance(factoid, str):
+            try:
+                factoid = db.choose_factoid(factoid)
+            except KeyError:
+                return
+            self.log.info(f'Bucket: _reply() convert factois: {factoid}')
+
         more.update(who=msg.nick, to=irc.nick,
-                    someone=self._somenick(), op=self._opnick())
+                    someone=self._someone(msg), op=self._opnick())
         subject, link, tidbit = factoid
         tidbit = db.resolve(tidbit, **more)            
         if link == 'reply':
             irc.reply(tidbit, prefixNick=False)
             return
         if link == 'action':
-            ## This is what should work but hits the assert.  val says
-            ## it's a bug so maybe it can be re-enabled in a future
-            ## version.
-            #irc.reply(tidbit, action=True, prefixNick=False)
+            if not addressed:
+                ## This is what should work but hits the assert.  val says
+                ## it's a bug so maybe it can be re-enabled in a future
+                ## version.
+                # irc.reply(tidbit, action=True, prefixNick=False)
 
-            ## This works around the assert but tickles Misc to throw.
-            # msg.tag('repliedTo')
-            # newMsg = ircmsgs.action(msg.channel, tidbit, msg=msg)
-            # irc.queueMsg(newMsg)
+                ## This works around the assert but tickles Misc to throw.
+                irc.noReply()
+                #msg.tag('repliedTo')
+                newMsg = ircmsgs.action(msg.channel, tidbit)# , msg=msg)
+                irc.queueMsg(newMsg)
 
-            ## This work-around works.
-            irc.reply(tidbit, action=True, noLengthCheck=True)
+            else:
+                ## This work-around works for addressed
+                irc.reply(tidbit, action=True, noLengthCheck=True)
             return
         reply = ' '.join([subject, link, tidbit])
         irc.reply(reply)
@@ -395,9 +548,11 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             capability = 'admin'
         else:
             capability = ircdb.makeChannelCapability(msg.channel, cap)
-        # dumb-ass tripple negative non-default default!
-        tf = ircdb.checkCapability(msg.prefix, capability, ignoreDefaultAllow=True)
-        self.log.info(f'isCapable: "{msg.prefix}" in "{msg.channel}" for "{cap}" -> {tf}')
+
+        tf = ircdb.checkCapability(msg.prefix, capability,
+                                   ignoreDefaultAllow=True,
+                                   ignoreChannelOp=True)
+        self.log.info(f'isCapable: "{msg.prefix}" in "{msg.channel}" for {capability} "{cap}" -> {tf}')
         return tf
 
     @wrap(['channeldb', 'text'])
@@ -411,13 +566,17 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
     # fixme: these probably need to be filled and retrieved via the
     # store so that they are per-channel.
-    def _somenick(self):
-        'Return nick of recently active user'
-        return "somenick"
     def _opnick(self):
         'Return nick of recently active op'
         return "someop"
             
+    def _someone(self, msg):
+        if msg.channel:
+            ls = set(self.last_seen[msg.channel])
+            ls.discard(msg.nick)
+            if ls:
+                return random.choice(list(ls))
+        return ""
 
 Class = Bucket
 

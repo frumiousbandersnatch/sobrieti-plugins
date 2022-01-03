@@ -16,13 +16,13 @@ def convert_items(mconn, bs):
     'Convert bucket_items into terms with kind="item".'
     #cur.execute("SELECT CONVERT(what USING latin1) FROM bucket_items WHERE id=39")
     mcur = mconn.cursor()
-    mcur.execute("SELECT id,CONVERT(what USING latin1) FROM bucket_items")
+    mcur.execute("SELECT id,CONVERT(what USING latin1),user FROM bucket_items")
     count = 0;
     for one in mcur:
         #print(one)
-        ident,text = one
+        ident,text,user = one
         text2 = fix_enc(text)
-        bs.term(text2, "item", False)
+        bs.term(text2, "item", False, creator=user)
         count += 1
     bs.db.commit()
     return count

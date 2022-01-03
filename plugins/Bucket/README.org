@@ -30,55 +30,65 @@ What does "somewhat" mean?
 
 ** Terms
 
-The Bucket mostly contains simple information called /terms/.  A term is
-some /text/ of a /kind/.  There can be many terms of a given kind.  Users
-are free to add new kinds and new values for existing kinds, though
-some kinds of terms are reserved for system use and special
-permissions are needed to modify them.
-
-The /text/ of a term may reference a kind of term by including ~$kind~.
-For example, 
+The Bucket mostly contains simple information called /terms/.  A term
+has some /text/ and it is of a /kind/.  The /kind/ determines how the bot
+may treat the /text/ in some special way.  And the name of a /kind/ can be
+used in the body of the text so that it may be substituted with a
+random /text/ of that kind.  For example, some term /text/ may be:
 
 #+begin_example
 I like $someone's $pet
 #+end_example
 
-If the Bucket uses this text in a reply then ~$someone~ will be replaced
-with the nick of a recently active user and ~$pet~ will be replaced with
-one of the /text/ from a term of /kind/ "pet".  The ~$someone~ is one of the
-special system terms but ~$pet~ is one that can be created and added to
-by anyone.
+And if that text is shown by the bot it may print
+
+#+begin_example
+I like frumious's cat
+#+end_example
+
+Some /kind/ variables are simple substitution and some provide special
+information about the IRC channel or have side effects on the Bucket
+itself.
 
 ** Items
 
-The Bucket is is bottomless in that it contains all it has been given.
-But, it also "holds" certain things special.  These are called
-"items" and are terms of the special ~item~ kind.
-
-We may give the Bucket an item
+The bucket "holds" things of the /kind/ ~item~.  We may give items
 
 #+begin_example
-/me gives bucket a horse
+/me gives Bucket a horse
 #+end_example
 
 And we may ask what items the Bucket holds
 
 #+begin_example
-bucket, inventory
-<bucket> I have a horse.
+  <user> Bucket, inventory
+<Bucket> I have a horse.
 #+end_example
 
 And the Bucket may be generous if asked
 
 #+begin_example
-<me> bucket, give me a present
-*bucket gives me a horse
+ <user> Bucket, give me a present
+        *Bucket gives me a horse
 #+end_example
 
-The Bucket can only hold so many items and will drop one if given
-another when full.  The Bucket can also be empty of held items.
-Besides explicitly giving and receiving items, special system terms
-can may used which have side effects on what the Bucket holds.
+The Bucket can only hold so many items and will drop one if given yet
+another when the inventory is full.  The Bucket can also be empty of
+held items.  Anyone may make the Bucket drop a particular inventory
+item.
+
+#+begin_example
+  <user>  @inventory
+          *Bucket is carrying 80488: good cat |80489: bad cat |80490: baddest cat
+  <user>  @drop bad cat
+          *Bucket fumbles and drops bad cat.
+  <user>  @drop 80490
+          *Bucket fumbles and drops baddest cat.
+#+end_example
+
+Besides explicitly giving and receiving items with commands as above
+there exits special term kinds which when seen in term text will
+interact with the inventory:
 
 - ~$held~ :: resolves to a random held item (no side effect)
 
@@ -88,32 +98,53 @@ can may used which have side effects on what the Bucket holds.
 - ~$give~ :: resolves to a random held item and as a side effect causes
   Bucket to no longer hold it.
 
+Note, ~$take~ does not check for inventory overflow and ~$give~ does not
+check for inventor underflow.  The latter may lead to "weird"
+response.
+
 ** Factoids
 
-The other special terms that the Bucket may hold build up "factoids".
-We may make a factoid like:
+There is a trio of special terms kinds which are used to define
+"factoids".  We may make a factoid like:
 
 #+begin_example
-<me> bucket, the moon is made of green cheese
+ <user> Bucket, the moon is made of green cheese
 #+end_example
 
-A factoid is a relationship built from three special kinds of terms, a
-~subject~ (~the moon~) a ~link~ (~is~) and a ~tidibit~ (~make of green cheese~).
-The verbs "is" and "are" are specially identified as links and any
-other links may be given as ~<link>~ such as:
+A trio of term kinds are ~subject~ (eg, ~the moon~) a ~link~ (~is~) and a
+~tidibit~ (~make of green cheese~).  The verbs "is" and "are" are
+specially identified as links and indeed links are generally verbs.
+Arbitrary links may be given in angle brackets as ~<link>~.  For
+example,
 
 #+begin_example
-<me> bucket, cats <run> circles around dogs
+ <user> Bucket, cats <run> circles around dogs
 #+end_example
 
-A link is generally considered a verb.  Two special links are:
+Two special links are:
 
-- ~<reply>~ :: When the factoid is triggered the Bucket replies with just the "tidbit".
-- ~<action>~ :: Like ~<reply>~ but the Bucket responds with an action
+- ~<reply>~ :: When the factoid is triggered the Bucket replies with just the "tidbit" part.
+- ~<action>~ :: Like ~<reply>~ but the Bucket responds with the tidbit as an action.
+
+#+begin_example
+ <user>  Bucket, jump <action> jumps
+ <user>  Bucket, jump <reply> How high?
+#+end_example
+
+We can trigger a factoid by telling the Bucket the ~subject~ part:
+
+#+begin_example
+ <user>  Bucket, cats
+<Bucket> cats run circles around dogs
+ <user>  Bucket, jump
+         *Bucket jumps
+#+end_example
 
 
 * Operator manual
 
+Some things we can do with the Bucket require permissions
+(capabilities) and require a bot account.
 
 ** Capabilities
 
@@ -123,13 +154,87 @@ these capabilities to limit operations at content level:
 - ~system~ :: May ~add~ or ~remove~ any (including system) factoids and
   terms.  System factoids need not be changed frequently and must
   follow certain rules as to their content and some expertise is
-  needed.
+  needed.  
 
 - ~op~ :: May ~remove~ (non-system) factoids or force dropping of a
   specific item.  This may be exercised, for example, to remove
-  factoids that are contrary to channel policy.
+  factoids that are contrary to channel policy or social norms.
 
+Note, bot ~op~ capability is *not* the same thing as having channel op
+status.  It is certainly reasonable for channel ops to also have bot
+~op~ or this janitorial duty can be delegated to non-channel-ops.
 
+** Operator registration
+
+Here's how to become a Bucket operator using standard limnoria
+commands.  We assume a user nick of ~botop~.
+
+1. Make a bot account.  *Warning* you will need to type passwords so do
+   the following in a private message session.  After the first
+   ~/query~, type the remaining in whatever "tab" opened in your IRC
+   client.
+
+#+begin_example
+/query Bucket
+user register botop <password>
+identify botop <password>
+hostmask add botop
+whoami
+#+end_example
+
+2. Request from someone with ~owner~ capability on the bot to add the ~op~
+   capability for the user on one or more channels.  The owner types:
+
+#+begin_example
+@channel capability add #<channel> botop op
+#+end_example
+
+** Removing factoids
+
+A bot ~op~ may remove a factoid:
+
+#+begin_example
+ <botop> @literal cats
+<Bucket> botop: cats: |772: <reply> Cats can be funny. |980: Cats are meanies
+ <botop> @remove factoid 980
+         *Bucket kicks Cats are meanies from the cats pool
+#+end_example
+
+Removing a factoid will leave its trio terms in the database until no
+other factoids reference them.  Going the other way, removing any of
+the trio of terms that make up a factoid will remove the factoids made
+from the term.
+
+A bot ~op~ can remove any term which is not part of the "system".
+System terms include a subset of the ~subject~ terms.  Remove a term
+like a factoid:
+
+#+begin_example
+ <botop>  @remove term 80496
+<Bucket>  Okay botop
+#+end_example
+
+A term ID may be found given the /kind/:
+
+#+begin_example
+ <botop>  @terms animals
+<Bucket>  I have these animal: 63034: giant golden-crowned flying fox |63035: giraffe |63036: great egret |63037: minor egret 
+ <botop>  @remove term 63037
+          *Bucket kicks minor egret from the animal pool
+#+end_example
+
+** TODO Term querying 
+
+Some terms, especially ~subject~ and ~tidbit~ used by factoids collect
+many /text/ values and finding the ID to remove one using ~@terms~ as
+above would require paging through many replies.  The (*NOT YET*)
+extended version can search fora match:
+
+#+begin_example
+ <botop>  @terms animals like egret
+ <botop>  @terms subject like cats
+ <botop>  @terms tidbit like cheese
+#+end_example
 
 
 * Differences from XKCD Bucket
@@ -191,8 +296,9 @@ The plugin also is a translational barrier between IRC stuff and the
 store.  It provides various regex based commands in addition to normal
 supybot commands
 
-- [ ] use auth capabilities to allow change to "system" fact subjects
-- [ ] single way to prepare =more= parameters (~$who~, ~$someone~)
+- [X] use auth capabilities to allow change to "system" fact subjects
+- [X] single way to prepare =more= parameters (~$who~, ~$someone~)
+- [ ] provide recent channel ~$op~ like ~$someone~
 - [X] regex based "give items"
 - [X] command: ~give~ 
 - [X] command: ~inventory~
@@ -201,11 +307,17 @@ supybot commands
 - [X] regex ~<<verb>>~ fact definition
 - [X] drop item if full
 - [X] command: ~literal~ factoid list 
-- [ ] command: editing factoid
-- [ ] command: ~undo last~ factoid
+- [X] command: ~remove~ factoid or term with cap
+- [X] command: ~remove~ factoid or term without cap if "creator"
+- [X] command: ~drop~ holding (anyone)
+- [X] command: ~undo last~ factoid in channel (~factoids recent/undo~)
+- [ ] command: ~forget that~ if have ~op~ cap
 - [ ] command: remember quote (requires keeping recent history)
-- [ ] gender
-- [ ] ~go away~ / ~come back~
+- [ ] gender stuff
+- [ ] ~go away~ / ~come back~ (though, really this should be a channel ~+m/-m~ thing!)
+- [ ] random trigger
+- [ ] random trigger after dead channel time
+- [ ] random triggers configurable with a list of subjects
 
 ** Store
 
@@ -222,14 +334,15 @@ supybot commands
 - [X] variable interpolation
 - [X] item deletion
 - [X] factoid deletion
-- [ ] factoid tidbit editing
-- [ ] factoid tidbit selection
+- [ ] term selection
+
 
 ** Prime
 
 - [X] default special replies
 - [X] change these to "system" 
 - [X] rationalize system factoid subject names
+- [X] make system creator explicit to mark system items and factoids
 
 ** Dump/load
 
@@ -239,4 +352,131 @@ supybot commands
 - [X] items
 - [X] vars
 - [X] basic CLI
+- [X] forward creator where it is provided (just items)
 - [ ] nicer CLI with mysql parameters, controlling individual actions
+
+* Bugs
+
+- [X] Addressed with a space should not trigger the bot.  
+
+#+begin_example
+<me> pale is already pantless
+<pail> ... nothing, should not reply ...
+#+end_example
+
+Won't fix in plugin: By default supybot considers ~botname<space>~ to
+trigger.  This can be turned off:
+
+#+begin_example
+@config supybot.reply.whenAddressedBy.strings ""
+#+end_example
+
+The ~botname,~ and ~botname:~ trigger not affected.
+
+- [X] ~pale, do you know this~ should not trigger ~Error: "do" is not a
+  valid command~.  It should try this as a factoid or else give ~factoid-unknown~.
+
+- [X] should trigger factoid without being addressed
+
+#+begin_example
+<me> pale, robe life <action> hangs her bathrobe by the heating vent, in accordance with The Teachings
+<me> robe life
+*pale hangs ...
+#+end_example
+
+- [X] should trigger on action:
+
+#+begin_example
+<me> pale, pets pale <reply> Feels good
+/me pets pale
+*pale Feels good
+#+end_example
+
+- [X] ignore single word unaddressed factoid triggers
+
+* sussing supy 
+
+Summary
+
+- actions are never commands
+- commands are tokenized (~@~ prefix stripped, extra spaces stripped)
+- ~@~ prefix is always a command
+- non-actions in PM are always commands
+- non-actions in channel are only commands when addressed
+
+An ~invalidCommand~ handler needs to 
+
+- raise error if  ~msg.args[1].startswith('@')~?, otherwise
+- call its any matching addressed regexp methods
+  - those should set ~irc.noReply()~ if they "consume" the message
+  - that should, I think, set msg.ignored
+
+A ~doPrivmsg~ handler needs to
+
+- ignore any ~msg.addressed~
+- query for subject matching ~msg.args[1]~ and chirp if found
+- otherwise, ignore
+
+Example output follows
+
+** In Channel
+
+#+begin_example
+<me> @blah
+invalidCommand(msg:|['##pale', '@blah']|, tokens:|['blah']|)
+doPrivmsg(msg:|['##pale', '@blah']|)
+#+end_example
+
+#+begin_example
+<me> blah blah
+doPrivmsg(msg:|['##pale', 'blah blah']|)
+#+end_example
+
+#+begin_example
+<me> pale blah blah
+invalidCommand(msg:|['##pale', 'pale blah blah']|, tokens:|['blah', 'blah']|)
+doPrivmsg(msg:|['##pale', 'pale blah blah']|)
+#+end_example
+
+#+begin_example
+<me> pale, blah blah
+invalidCommand(msg:|['##pale', 'pale, blah blah']|, tokens:|['blah', 'blah']|)
+doPrivmsg(msg:|['##pale', 'pale, blah blah']|)
+#+end_example
+
+#+begin_example
+/me blah blah
+doPrivmsg(msg:|['##pale', '\x01ACTION blah blah\x01']|)
+#+end_example
+
+** In PM
+
+#+begin_example
+<me> @blah
+invalidCommand(msg:|['pale', '@blah']|, tokens:|['blah']|)
+doPrivmsg(msg:|['pale', '@blah']|)
+#+end_example
+
+#+begin_example
+<me> blah blah
+invalidCommand(msg:|['pale', 'blah blah']|, tokens:|['blah', 'blah']|)
+doPrivmsg(msg:|['pale', 'blah blah']|)
+#+end_example
+
+
+#+begin_example
+<me> pale blah blah
+invalidCommand(msg:|['pale', 'pale blah blah']|, tokens:|['pale', 'blah', 'blah']|)
+doPrivmsg(msg:|['pale', 'pale blah blah']|)
+#+end_example
+
+#+begin_example
+<me> pale, blah blah
+invalidCommand(msg:|['pale', 'pale, blah blah']|, tokens:|['pale,', 'blah', 'blah']|)
+doPrivmsg(msg:|['pale', 'pale, blah blah']|)
+#+end_example
+
+#+begin_example
+/me blah blah
+doPrivmsg(msg:|['pale', '\x01ACTION blah blah\x01']|)
+#+end_example
