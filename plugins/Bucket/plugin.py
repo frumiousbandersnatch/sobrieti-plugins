@@ -29,6 +29,7 @@
 ###
 
 import re
+import time
 import random
 from collections import defaultdict
 from importlib import reload
@@ -40,6 +41,8 @@ import supybot.ircmsgs as ircmsgs
 from supybot import utils, plugins, ircutils, callbacks
 from supybot.commands import *
 import supybot.world as world
+import supybot.schedule as schedule
+
 try:
     from supybot.i18n import PluginInternationalization
     _ = PluginInternationalization('Bucket')
@@ -55,18 +58,114 @@ except ImportError:
 # - if action then \x01ACTION the action\x01
 # irc.nick is bot nick
 
+# histories:
+# triggered factoids
+# seen nicks
+# seen opers
+# per nick lines
+
+class TransientChannelHistory:
+    'Track recent things in a channel'
+    def __init__(self, maxsaid=100, maxfact=100):
+        self._maxsaid = maxsaid
+        self._maxfact = maxfact
+        self.nicks = list()
+        self.said = defaultdict(list)
+        self.triggered = list()
+
+    def add_msg(self, msg):
+        try:
+            self.nicks.remove(msg.nick)
+        except ValueError:
+            pass
+        self.nicks.insert(0, msg.nick)
+
+        said = self.said[msg.nick]
+        pmsg = ircmsgs.prettyPrint(msg)
+        self.said[msg.nick] = [pmsg] + said[:self._maxsaid-1]
+        
+    def add_factoid(self, factoid):
+        self.remove_factoid(factoid)
+        self.triggered = [factoid] + self.triggered[:self._maxfact-1]
+    def remove_factoid(self, factoid):
+        try:
+            self.triggered.remove(factoid)
+        except ValueError:
+            pass
+        
+
+class TransientHistory:
+    'Track recent things'
+    def __init__(self, maxlen=100):
+        self.hist = defaultdict(TransientChannelHistory)
+
+    def add_msg(self, msg):
+        if not msg.channel:
+            return
+        self.hist[msg.channel].add_msg(msg)
+    def add_factoid(self, channel, factoid):
+        if not channel:
+            return
+        self.hist[channel].add_factoid(factoid)
+    def remove_factoid(self, channel, factoid):
+        if not channel:
+            return
+        self.hist[channel].remove_factoid(factoid)
+    def get_factoids(self, channel):
+        if not channel:
+            return []
+        return self.hist[channel].triggered
+
+    def not_you(self, msg):
+        if not msg.channel:
+            return []
+        nicks = list(self.hist[msg.channel].nicks)
+        try:
+            nicks.remove(msg.nick)
+        except ValueError:
+            return []
+        return nicks
+
+    def anyone(self, msg):
+        nicks = self.not_you(msg)
+        try:
+            return random.choice(nicks)
+        except IndexError:
+            return ""
+
+    def someone(self, msg):
+        nicks = self.not_you(msg)        
+        try:
+            return nicks[0]
+        except IndexError:
+            return ""
+
+    def opnick(self, msg):
+        return ""
+
+    def more(self, msg):
+        return dict(who=msg.nick,
+                    anyone=self.anyone(msg),
+                    someone=self.someone(msg),
+                    op=self.opnick(msg))
+
+
 class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     """Mostly compatible implementation of XKCD Bucket"""
     threaded = True
     public = True
     regexps = []
-    addressedRegexps = ["a_re_factoid", "a_re_explain", "a_re_matchlike", "junk_addr"]
-    unaddressedRegexps = ["un_re_say", "un_re_items1", "un_re_items2", "junk_unaddr"]
+    addressedRegexps = ["a_re_goaway", "a_re_comeback",
+                        "a_re_factoid", "a_re_explain", "a_re_matchlike",
+                        "junk_addr"]
+    unaddressedRegexps = ["un_re_say", "un_re_items1", "un_re_items2",
+                          "junk_unaddr"]
 
     def __init__(self, irc):
         callbacks.PluginRegexp.__init__(self, irc)
         plugins.ChannelDBHandler.__init__(self)
-        self.last_seen = defaultdict(list)
+        self.hist = TransientHistory()
+        self.meek = defaultdict(bool)       # do not respond to unaddressed when true.
 
     def makeDb(self, filename):
         return bucket.store.Bucket(filename)
@@ -83,6 +182,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             self.log.info(f'Bucket: dispatch addressed meth:|{name}| regex:|{repr(r)}| string:|{repr(s)}|')
             for m in r.finditer(s):
                 self._callRegexp(name, irc, msg, m)
+                if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
+                    return
 
         self.log.info(f'Bucket: invalidCommand: tags: {msg.tags}')
         if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
@@ -90,15 +191,14 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         self._reply(irc, msg, 'factoid-unknown', thesubject=msg.addressed)
 
     def doPrivmsg(self, irc, msg):
-        if msg.channel:
-            ls = list(self.last_seen[msg.channel])
-            try:
-                ls.remove(msg.nick)
-            except ValueError:
-                pass
-            self.last_seen[msg.channel] = [msg.nick] + ls[:5]
-            # fixme,make that 5 configurable
+        self.hist.add_msg(msg)
 
+        if self.meek[msg.channel]:
+            self.log.info(f'MEEK: ignoring unaddressed: "{msg.args}"')
+            irc.noReply()
+            return
+
+        # unaddressed
         callbacks.PluginRegexp.doPrivmsg(self, irc, msg)
         if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
             return
@@ -202,14 +302,18 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         db.purge_term(text, kind)
         self._reply(irc, msg, "term-removed", thekind=kind, thetext=text)
 
-    def _remove_factoid(self, irc, msg, db, ident, check_caps=True):
+    def _remove_factoid(self, irc, msg, db, ident):
         factoid = db.idfactoid(ident)
         if not factoid:
             self._reply(irc, msg, 'factoid-unknown')
             return
 
+        # fixme make configurable, and make it time based
+        recent_n = 5
+
         # fixme: maybe let people remove w/out caps if they are creator
-        if check_caps:
+        lf = db.recent_factoids(recent_n, return_facts=False)
+        if ident not in lf: # old ones need permission to purge
             if db.is_system_fact(factoid):
                 cap_needed = 'system'
             else:
@@ -221,6 +325,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
         s,l,t = factoid
         db.purge_factoid(s,l,t)
+        self.hist.remove_factoid(msg.channel, factoid)
         self._reply(irc, msg, "factoid-removed",
                     thesubject=s, thelink=l, thetidbit=t)
 
@@ -236,12 +341,64 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         else:
             self._remove_factoid(irc, msg, db, ident)
         
+    @wrap(['channeldb', 'text'])
+    def forget(self, irc, msg, args, channel, what):
+        """[<channel>] <what>
+
+        Forget a factoid.  When <what> is "that" or "last", forget the
+        most recently triggered.  If <what> is a number, then forget
+        the n'th triggered ("that" is same as 0).
+        """
+        db = self.getDb(channel)
+        lts = self.hist.get_factoids(msg.channel)
+        fids = [db.factoidid(one) for one in lts]
+        self._remove_factoid_from_ids(irc, msg, db, what, fids)
+
+    @wrap(['channeldb', 'text'])
+    def undo(self, irc, msg, args, channel, what):
+        """[<channel>] <what>
+
+        Undo a recently made factoid.  When <what> is "that" or "last"
+        undo the most recently defined factoid.  If <what> is a number
+        then forget the n'th oldest ("last" is same as 0).
+        """
+        db = self.getDb(channel)
+        recent_n = 5
+        fids = db.recent_factoids(recent_n, return_facts=False)
+        self._remove_factoid_from_ids(irc, msg, db, what, fids)
+
+    def _remove_factoid_from_ids(self, irc, msg, db, what, fids):
+        'Handle choosing and checking if in channel'
+
+        if not fids:
+            irc.reply("No recent factoids")
+            return
+
+        if not msg.channel:
+            irc.reply("I can only do this in a channel")
+            return
+
+        if what in ("that", "last"):
+            index = 0
+        else:
+            index = int(what)
+
+        try:
+            fid = fids[index]
+        except IndexError:
+            irc.reply("I don't remember that many")
+            return
+
+        self._remove_factoid(irc, msg, db, fid)
+        return fid
+
+
 
     @wrap(['channeldb', ('literal', ('recent', 'show', 'undo')), optional('int')])
     def factoids(self, irc, msg, args, channel, cmd, ident):
         """[<channel>] (recent|show|undo) [<ID>]
 
-        List or undo recent factoids or show a factoid.
+        Do things with factoids.  Some need 'op' capability.
         """
         self.log.info(f'FACTOIDS: cmd:|{repr(cmd)}| ident:|{repr(ident)}|')
 
@@ -254,7 +411,6 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             self._reply(irc, msg, slt)
             return
 
-        # fixme make configurable, and make it time based
         recent_n = 5
 
         if cmd == "recent":
@@ -271,12 +427,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             return
 
         if cmd == "undo":
-            lf = db.recent_factoids(recent_n, return_facts=False)
-            check_caps = False
-            if ident not in lf: # old ones need permission to purge
-                check_caps = True
-            self._remove_factoid(irc, msg, db, ident, check_caps)
-            
+            self._undo(ir, msg, db, 0)
 
     @wrap(['channeldb', 'text'])
     def terms(self, irc, msg, args, channel, kind):
@@ -347,9 +498,11 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             if name == "me":
                 name = msg.nick
             if name == "someone":
-                name = self._someone()
+                name = self.hist.someone(msg)
+            if name == "anyone":
+                name = self.hist.anyone(msg)
             if name in ("ops","chanop"):
-                name = self._someop()
+                name = self.hist.opnick(msg)
             if len(db.held_items()) == 0:
                 self._reply(irc, msg, 'item-underflow')
                 return
@@ -468,6 +621,46 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             return
         # for now, no support for edit
             
+    def _set_come_back_event(self, channel, delay):
+        'Set a come back event for channel for delay seconds in the future and go meek'
+        event = self._del_come_back_event(channel)
+        self.log.info(f'MEEK: set event "{event}"')
+        self.meek[channel] = True
+        later = time.time() + delay
+        def restore():
+            self.log.info("MEEK: I'm back, biatch!")
+            self.meek[channel] = False
+        schedule.addEvent(restore, later, name=event)
+
+    def _del_come_back_event(self, channel):
+        'remove come back event for channel if there and stop being meek'
+        event = channel+'_come_back'
+        self.log.info(f'MEEK: del event "{event}"')
+        try:
+            schedule.removeEvent(event)
+        except KeyError:
+            pass
+        self.meek[channel] = False
+        return event
+
+    def a_re_goaway(self, irc, msg, regex):
+        r"^(?P<what>go away|fuck off|shut up)$"
+        # people can be so cruel
+        if not msg.channel:
+            irc.reply("Yell at me in a channel, not in a PM")
+            return
+        delay = self.registryValue('meek_time')
+        self._reply(irc, msg, 'go-away', thechannel=msg.channel, theduration=delay)
+        self._set_come_back_event(msg.channel, delay)
+        
+    def a_re_comeback(self, irc, msg, regex):
+        r"^(?P<what>come back)$"
+        if not msg.channel:
+            irc.reply("No channel to come back to")
+            return
+        self._del_come_back_event(msg.channel)
+        self._reply(irc, msg, 'come-back', thechannel=msg.channel)
+
     def junk_addr(self, irc, msg, regex):
         r".*"
         self.log.info(f'addressed: msg:|{repr(msg.args[1])}|, regex:|{repr(regex)}|')
@@ -505,10 +698,12 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
                 factoid = db.choose_factoid(factoid)
             except KeyError:
                 return
-            self.log.info(f'Bucket: _reply() convert factois: {factoid}')
+            self.log.info(f'Bucket: _reply() convert factoids: {factoid}')
 
-        more.update(who=msg.nick, to=irc.nick,
-                    someone=self._someone(msg), op=self._opnick())
+        if msg.channel and not db.is_system_fact(factoid[0]):
+            self.hist.add_factoid(msg.channel, factoid)
+
+        more.update(self.hist.more(msg), to=irc.nick)
         subject, link, tidbit = factoid
         tidbit = db.resolve(tidbit, **more)            
         if link == 'reply':
@@ -563,21 +758,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         """
         tf = self._isCapable(msg, 'system')
         irc.reply(f'isCapable: "{msg.prefix}" in "{msg.channel}" for "{cap}" -> {tf}')        
-
-    # fixme: these probably need to be filled and retrieved via the
-    # store so that they are per-channel.
-    def _opnick(self):
-        'Return nick of recently active op'
-        return "someop"
             
-    def _someone(self, msg):
-        if msg.channel:
-            ls = set(self.last_seen[msg.channel])
-            ls.discard(msg.nick)
-            if ls:
-                return random.choice(list(ls))
-        return ""
-
 Class = Bucket
 
 

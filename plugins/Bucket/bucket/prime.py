@@ -133,6 +133,17 @@ system_facts = {
         ("action", 'pretends to drop a missing item'),
     ],
 
+    "go-away" : [
+        ("reply", "Okay $who.  I'll come back later."),
+        ("reply", "No problem, see you in about $theduration seconds.")
+    ],
+    "come-back" : [
+        ("reply", "\o/"),
+        ("reply", "I'm back, did you miss me?"),
+        ("action", "sneaks back in"),
+        ("action", "wakes up"),
+    ],
+    
     # common conversations
 
     "I want a present": [

@@ -54,5 +54,7 @@ Bucket = conf.registerPlugin('Bucket')
 
 conf.registerGlobalValue(Bucket, "max_items",
                          registry.Integer(10, _("""The max number of items in the bucket""")))
+conf.registerGlobalValue(Bucket, "meek_time",
+                         registry.Integer(3600, _("""Time in seconds the will go away when asked""")))
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:

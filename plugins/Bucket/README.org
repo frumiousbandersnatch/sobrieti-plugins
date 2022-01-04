@@ -310,11 +310,11 @@ supybot commands
 - [X] command: ~remove~ factoid or term with cap
 - [X] command: ~remove~ factoid or term without cap if "creator"
 - [X] command: ~drop~ holding (anyone)
-- [X] command: ~undo last~ factoid in channel (~factoids recent/undo~)
-- [ ] command: ~forget that~ if have ~op~ cap
+- [X] command: ~undo last~ factoid in channel (also ~factoids recent/undo~)
+- [X] command: ~forget that~ if have ~op~ cap
 - [ ] command: remember quote (requires keeping recent history)
 - [ ] gender stuff
-- [ ] ~go away~ / ~come back~ (though, really this should be a channel ~+m/-m~ thing!)
+- [X] ~go away~ / ~come back~ (though, really this should be a channel ~+m/-m~ thing!)
 - [ ] random trigger
 - [ ] random trigger after dead channel time
 - [ ] random triggers configurable with a list of subjects
@@ -334,7 +334,7 @@ supybot commands
 - [X] variable interpolation
 - [X] item deletion
 - [X] factoid deletion
-- [ ] term selection
+- [ ] term selection 
 
 
 ** Prime
@@ -353,7 +353,7 @@ supybot commands
 - [X] vars
 - [X] basic CLI
 - [X] forward creator where it is provided (just items)
-- [ ] nicer CLI with mysql parameters, controlling individual actions
+- [X] add dumpload to cli
 
 * Bugs
 
@@ -393,6 +393,9 @@ The ~botname,~ and ~botname:~ trigger not affected.
 #+end_example
 
 - [X] ignore single word unaddressed factoid triggers
+
+- [ ] In ~forget~ and others, replace raw ~irc.reply()~ calls with
+  ~self._reply()~ and define appropriate system factoids.
 
 * sussing supy 
 

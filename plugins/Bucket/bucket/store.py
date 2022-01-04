@@ -240,6 +240,20 @@ class Bucket:
         LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
         WHERE fact.id=?""", (fid,)).fetchone()
 
+    def factoidid(self, factoid):
+        '''
+        Return the ID of the factoid (subject,link,tidbit) or None.
+        '''
+        got = self.sql("""
+        SELECT fact.id
+        FROM facts fact
+        LEFT JOIN terms subject ON subject.id = fact.subject_id
+        LEFT JOIN terms link    ON link.id    = fact.link_id
+        LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
+        WHERE subject.text=? and link.text=? and tidbit.text=?""", factoid)
+        if got:
+            return got.fetchone()[0]
+        return
 
     def factoid(self, subject, link, tidbit, commit=True, creator=""):
         '''
