@@ -7,16 +7,30 @@ Dump from XKCD Bucket MySQL and/or load to Pail sqlite3
 import mysql.connector
 from . import store
 
-def fix_enc(text, encoding='latin1'):
-    'Fix encoding.'
-    data = bytes(text, encoding, errors="ignore")
-    return data.decode(errors="ignore")
+
+def fix_enc(text):
+    'Try to fix encoding.'
+
+    for encoding in ('latin-1', 'cp1252'):
+        try:
+            got = bytes(text, encoding, errors="ignore").decode()
+            #print(f'{encoding}: {got}')
+            return got.strip()
+        except UnicodeDecodeError:
+            continue
+    got = bytes(text, 'cp1252', errors="ignore").decode(errors='ignore')    
+    if not got.strip():
+        return ""
+    #print(f'give up: "{got}" from repr:"{repr(text)}" string:"{text}"')
+    return got
+
 
 def convert_items(mconn, bs):
     'Convert bucket_items into terms with kind="item".'
     #cur.execute("SELECT CONVERT(what USING latin1) FROM bucket_items WHERE id=39")
     mcur = mconn.cursor()
-    mcur.execute("SELECT id,CONVERT(what USING latin1),user FROM bucket_items")
+    #mcur.execute("SELECT id,CONVERT(what USING latin1),user FROM bucket_items")
+    mcur.execute("SELECT id,what,user FROM bucket_items")
     count = 0;
     for one in mcur:
         #print(one)
@@ -30,9 +44,15 @@ def convert_items(mconn, bs):
 def convert_vars(mconn, bs):
     'Convert bucket_vars/bucket_values into terms with kind according to .name'
     mcur = mconn.cursor()
+    # mcur.execute("""SELECT
+    # CONVERT(bucket_vars.name USING latin1) AS kind,
+    # CONVERT(bucket_values.value USING latin1) as text
+    # FROM bucket_vars
+    # INNER JOIN bucket_values
+    # ON bucket_values.var_id = bucket_vars.id""")
     mcur.execute("""SELECT
-    CONVERT(bucket_vars.name USING latin1) AS kind,
-    CONVERT(bucket_values.value USING latin1) as text
+    bucket_vars.name AS kind,
+    bucket_values.value as text
     FROM bucket_vars
     INNER JOIN bucket_values
     ON bucket_values.var_id = bucket_vars.id""")
@@ -41,6 +61,8 @@ def convert_vars(mconn, bs):
     for kind,text in mcur:
         kind = fix_enc(kind)
         text = fix_enc(text)
+        if not text.strip():
+            continue
         bs.term(text, kind, False)
         count += 1
     bs.db.commit()
@@ -49,10 +71,12 @@ def convert_vars(mconn, bs):
 def convert_facts(mconn, bs):
     'Convert bucket_facts to term triplets'
     mcur = mconn.cursor()
-    mcur.execute("""SELECT
-    CONVERT(fact USING latin1) AS subject,
-    CONVERT(verb USING latin1) AS link,
-    CONVERT(tidbit USING latin1) AS tidbit
+    # mcur.execute("""SELECT
+    # CONVERT(fact USING latin1) AS subject,
+    # CONVERT(verb USING latin1) AS link,
+    # CONVERT(tidbit USING latin1) AS tidbit
+    # FROM bucket_facts""")
+    mcur.execute("""SELECT fact, verb, tidbit
     FROM bucket_facts""")
     count = 0
     for subject,link,tidbit in mcur:
@@ -60,16 +84,12 @@ def convert_facts(mconn, bs):
             link = link[1:-1]
 
         if not subject.isascii():
-            fixed = fix_enc(subject)
-            if not fixed:
-                fixed = fix_enc(tidbit, 'cp1252')
-            subject = fixed
+            subject = fix_enc(subject)
 
         if not tidbit.isascii():
-            fixed = fix_enc(tidbit)
-            if not fixed:
-                fixed = fix_enc(tidbit, 'cp1252')
-            tidbit = fixed
+            tidbit = fix_enc(tidbit)
+            if not tidbit.strip():
+                continue
 
         bs.factoid(subject, link, tidbit, False)
         count += 1

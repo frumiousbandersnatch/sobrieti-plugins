@@ -54,7 +54,9 @@ system_facts = {
     "factoid-broken": [
         ("reply", "Hmm, that looks weird"),
     ],
-
+    "factoid-empty": [
+        ("reply", "Nothing known about $thesubject"),
+    ],
 
     # Non-item terms.  The special $thekind and $thetext are defined
     # and refer to the particular term kind and its text.

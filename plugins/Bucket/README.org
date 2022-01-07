@@ -410,6 +410,21 @@ The ~botname,~ and ~botname:~ trigger not affected.
 
 - [X] don't reply to short unaddressed factoids, with "short" configurable
 
+- [X] ~literal~ with nothing should say so not make an empty list
+
+- [X] ~forget~ that fails should say so
+
+- [ ] interject if someone else is addressed with a factoid
+
+#+begin_example
+<me> fred, fix it
+     *pale sharpens a mop
+#+end_example
+
+- [X] encoding problems.  
+
+
+
 * sussing supy 
 
 Summary

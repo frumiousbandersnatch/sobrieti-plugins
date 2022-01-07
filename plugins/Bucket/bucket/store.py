@@ -289,10 +289,10 @@ class Bucket:
         got = self.sql("""
         SELECT created_by FROM terms 
         WHERE kind='subject' AND text=?
-        """, (subject,))
+        """, (subject,)).fetchone()
         if not got:
             return None
-        return got.fetchone()[0] == self.system_nick
+        return got[0] == self.system_nick
 
     def purge_subject(self, subject):
         '''

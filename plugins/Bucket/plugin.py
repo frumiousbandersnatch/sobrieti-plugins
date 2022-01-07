@@ -263,6 +263,10 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             if l not in ("is","are"):
                 l = f'<{l}>'
             lines.append(f'{fid}: {l} {t}')
+        if not lines:
+            self._reply(irc, msg, 'factoid-empty', thesubject=subject)
+            return
+
         self.log.info(f'literal: "{subject}": {lines}')
         body = ' |'.join(lines)
         reply = f'{subject}: |{body}'
@@ -388,7 +392,11 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         if what in ("that", "last"):
             index = 0
         else:
-            index = int(what)
+            try:
+                index = int(what)
+            except ValueError:
+                irc.reply("Uh, no") # fixme, use _reply
+                return
 
         try:
             fid = fids[index]
