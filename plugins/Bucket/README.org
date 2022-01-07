@@ -167,26 +167,30 @@ status.  It is certainly reasonable for channel ops to also have bot
 ** Operator registration
 
 Here's how to become a Bucket operator using standard limnoria
-commands.  We assume a user nick of ~botop~.
+commands.  We will assume you register your bot user name as ~myuser~.
+This can be your nick name or it can be another name.  It is what you
+will when you identify to the bot (similar but different from how you
+may identify to the IRC network).
 
-1. Make a bot account.  *Warning* you will need to type passwords so do
-   the following in a private message session.  After the first
-   ~/query~, type the remaining in whatever "tab" opened in your IRC
-   client.
-
+- Step 1 :: Make a bot account.  *Warning* you will need to type
+  passwords so do the following in a private message session.  After
+  the first ~/query~, type the remaining in whatever "tab" opened in
+  your IRC client.
 #+begin_example
 /query Bucket
-user register botop <password>
-identify botop <password>
-hostmask add botop
+user register myuser <password>
+identify myuser <password>
+hostmask add myuser
 whoami
 #+end_example
 
-2. Request from someone with ~owner~ capability on the bot to add the ~op~
-   capability for the user on one or more channels.  The owner types:
+- Step 2 :: Request from someone with ~owner~ capability on the bot to add
+  the ~op~ capability for the user on one or more channels.  
+
+The ~owner~ then needs to type:
 
 #+begin_example
-@channel capability add #<channel> botop op
+@channel capability add #<channel> myuser op
 #+end_example
 
 ** Removing factoids
@@ -194,9 +198,9 @@ whoami
 A bot ~op~ may remove a factoid:
 
 #+begin_example
- <botop> @literal cats
-<Bucket> botop: cats: |772: <reply> Cats can be funny. |980: Cats are meanies
- <botop> @remove factoid 980
+<myuser> @literal cats
+<Bucket> myuser: cats: |772: <reply> Cats can be funny. |980: Cats are meanies
+<myuser> @remove factoid 980
          *Bucket kicks Cats are meanies from the cats pool
 #+end_example
 
@@ -210,16 +214,16 @@ System terms include a subset of the ~subject~ terms.  Remove a term
 like a factoid:
 
 #+begin_example
- <botop>  @remove term 80496
-<Bucket>  Okay botop
+<myuser>  @remove term 80496
+<Bucket>  Okay myuser
 #+end_example
 
 A term ID may be found given the /kind/:
 
 #+begin_example
- <botop>  @terms animals
+<myuser>  @terms animals
 <Bucket>  I have these animal: 63034: giant golden-crowned flying fox |63035: giraffe |63036: great egret |63037: minor egret 
- <botop>  @remove term 63037
+<myuser>  @remove term 63037
           *Bucket kicks minor egret from the animal pool
 #+end_example
 
@@ -231,9 +235,9 @@ above would require paging through many replies.  The (*NOT YET*)
 extended version can search fora match:
 
 #+begin_example
- <botop>  @terms animals like egret
- <botop>  @terms subject like cats
- <botop>  @terms tidbit like cheese
+ <myuser>  @terms animals like egret
+ <myuser>  @terms subject like cats
+ <myuser>  @terms tidbit like cheese
 #+end_example
 
 
@@ -254,7 +258,7 @@ provide new functionality.
 
 - =$held= :: an item currently held.  (Used to be =$item=)
 
-- $take :: any item, bot will now hold it (Used to be =$newitem=)
+- ~$take~ :: any item, bot will now hold it (Used to be =$newitem=)
 
 - =$give= :: a held item, bot will drop it (Used to be =$giveitem=)
 
@@ -396,6 +400,15 @@ The ~botname,~ and ~botname:~ trigger not affected.
 
 - [ ] In ~forget~ and others, replace raw ~irc.reply()~ calls with
   ~self._reply()~ and define appropriate system factoids.
+
+- [X] don't highlight to the nick that made an unaddressed trigger, just say the reply
+
+#+begin_example
+<me> anyways
+<pale> anyways is a perfectly cromulent word
+#+end_example
+
+- [X] don't reply to short unaddressed factoids, with "short" configurable
 
 * sussing supy 
 

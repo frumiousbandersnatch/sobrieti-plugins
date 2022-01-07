@@ -54,7 +54,11 @@ Bucket = conf.registerPlugin('Bucket')
 
 conf.registerGlobalValue(Bucket, "max_items",
                          registry.Integer(10, _("""The max number of items in the bucket""")))
+conf.registerGlobalValue(Bucket, "min_to_reply",
+                         registry.Integer(3, _("""Only trigger on unaddressed factoid subjects at least this many characters""")))
 conf.registerGlobalValue(Bucket, "meek_time",
                          registry.Integer(3600, _("""Time in seconds the will go away when asked""")))
+conf.registerGlobalValue(Bucket, "recent_volatile",
+                         registry.Integer(5, _("""Number of recent factoids subject to removal wthout op permission""")))
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:

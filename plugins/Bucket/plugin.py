@@ -171,11 +171,13 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         return bucket.store.Bucket(filename)
 
     def invalidCommand(self, irc, msg, tokens):
-        self.log.info(f'Bucket: invalidCommand(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, tokens:|{repr(tokens)}|)')
+        self.log.info(f'Bucket({irc.nick}): invalidCommand(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, tokens:|{repr(tokens)}|)')
 
-        # fixme: check msg.args[1].startswith("@") but get "@" from config
-        # and simply return if found
-        
+        if msg.args[1].startswith(irc.nick + ' '):
+            self.log.info(f'Bucket({irc.nick}): not replying to space-nick')
+            irc.noReply()
+            return
+
         # fixme: call this block via super(), for now we chirp inside
         s = ' '.join(tokens)
         for (r, name) in self.addressedRes:
@@ -204,6 +206,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             return
 
         # fixme: use configured 
+        # supybot.reply.whenAddressedBy.chars
         if msg.args[1].startswith('@'):
             return
 
@@ -213,7 +216,12 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         if got:
             line = got['line']
             self.log.info(f'UNMATCHED2: str:|{line}| repr:|{repr(line)}|')
+
         # OG bucket seems to not freely reply to "hi" but will to others.
+        min_to_reply = self.registryValue('min_to_reply')
+        if len(msg.args[1]) < min_to_reply:
+            return
+
         self._reply(irc, msg, line, addressed=False)
         
 
@@ -308,8 +316,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             self._reply(irc, msg, 'factoid-unknown')
             return
 
-        # fixme make configurable, and make it time based
-        recent_n = 5
+        recent_n = self.registryValue('recent_volatile')
 
         # fixme: maybe let people remove w/out caps if they are creator
         lf = db.recent_factoids(recent_n, return_facts=False)
@@ -363,7 +370,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         then forget the n'th oldest ("last" is same as 0).
         """
         db = self.getDb(channel)
-        recent_n = 5
+        recent_n = self.registryValue('recent_volatile')
         fids = db.recent_factoids(recent_n, return_facts=False)
         self._remove_factoid_from_ids(irc, msg, db, what, fids)
 
@@ -411,8 +418,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             self._reply(irc, msg, slt)
             return
 
-        recent_n = 5
-
+        recent_n = self.registryValue('recent_volatile')
         if cmd == "recent":
             lf = db.recent_factoids(recent_n)
             if not lf:
@@ -727,7 +733,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
                 irc.reply(tidbit, action=True, noLengthCheck=True)
             return
         reply = ' '.join([subject, link, tidbit])
-        irc.reply(reply)
+        irc.reply(reply, prefixNick=addressed)
 
     def _getUsername(self, msg):
         try:
