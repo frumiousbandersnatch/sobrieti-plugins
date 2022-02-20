@@ -6,7 +6,10 @@ from html import unescape
 
 from supybot.commands import *
 
+from html2text import HTML2Text
 
+
+from bs4 import BeautifulSoup
 
 import supybot.callbacks as callbacks
 
@@ -21,16 +24,22 @@ def lookup(word):
     if ety.status_code != 200:
         return "%s not found" % word
 
-    # thank you sopel hackers!
-    # https://github.com/sopel-irc/sopel/pull/1432/files
-    # Let's find it
-    start = ety.text.find("word__defination")
-    start = ety.text.find("<p>", start)
-    stop = ety.text.find("</p>", start)
-    sentence = ety.text[start + 3:stop]
-    # Clean up
-    sentence = unescape(sentence)
-    sentence = sub('<[^<]+?>', '', sentence)
+    soup = BeautifulSoup(ety.text)
+    
+    h2t = HTML2Text()
+    h2t.ignore_links = True
+    sentence = h2t.handle(str(soup.find("section"))).replace("\n", " ").strip()
+
+    # # thank you sopel hackers!
+    # # https://github.com/sopel-irc/sopel/pull/1432/files
+    # # Let's find it
+    # start = ety.text.find("word__defination")
+    # start = ety.text.find("<p>", start)
+    # stop = ety.text.find("</p>", start)
+    # sentence = ety.text[start + 3:stop]
+    # # Clean up
+    # sentence = unescape(sentence)
+    # sentence = sub('<[^<]+?>', '', sentence)
 
     maxlength = 275
     if len(sentence) > maxlength:
