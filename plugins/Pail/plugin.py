@@ -44,7 +44,8 @@ except:
 
 
 import shelve
-import bag
+from . import bag
+from importlib import reload
 reload(bag)                     # support reloading this module
 
 class Pail(callbacks.Plugin):
