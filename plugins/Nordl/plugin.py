@@ -39,94 +39,163 @@ except ImportError:
     _ = lambda x: x
 
 import random
-from importlib import reload
 from . import nordl
-reload(nordl)
+from importlib import reload as reload_module
+reload_module(nordl)
 
 from collections import defaultdict
 
 import os
 mydir = os.path.dirname(__file__)
 
-class Nordl(callbacks.Plugin):
+class Nordl(callbacks.Plugin, plugins.ChannelDBHandler):
     """An n-char implementation of wordle"""
+    threaded = True
+    public = True
 
     def __init__(self, irc):
-        self.__parent = super(Nordl, self)
-        self.__parent.__init__(irc)
+        callbacks.Plugin.__init__(self, irc)
+        plugins.ChannelDBHandler.__init__(self)
         # map from tuple(channel,nick)
         self._games = dict()
         # fixme: make persistent, history, leaderboard....
 
-    def _get_game(self, irc, msg, channel):
-        key = (channel, msg.nick)
-        try:
-            return self._games[key]
-        except KeyError:
-            irc.reply(f'No past nor existing nordl game for {key}, try "start" command')
-            raise
+    def makeDb(self, filename):
+        return nordl.Field(filename)
 
-    def _play(self, irc, msg, channel, guess):
-        'One play of the game with reply'
-        try:
-            game = self._get_game(irc, msg, channel)
-        except KeyError:
-            return
 
-        yn, line = game.guess(guess)
-        if yn:
-            rep = f'{line} got it in {len(game)}!'
-        else:
-            rep = f'{line} #{len(game)}'
-        irc.reply(rep)
+    @wrap(['channelDb', optional("int", 5)])
+    def start(self, irc, msg, args, channel, length):
+        '''[length]
 
-    @wrap(['channelDb', optional("int", 5), optional("something", "")])
-    def start(self, irc, msg, args, channel, length, guess):
-        '''[length] [first-guess]
-
-        Start a nordl game.  Give number for word length, default is 5.
+        Start a nordl game.  Give number for word length, default is 5 letters.
         '''
-        length = max(2, min(9,length))
-        text = random.choice(open(f'{mydir}/words-{length}').read().split('\n'))
-        game = nordl.Game(text, 'dark')
-        key = (channel, msg.nick)
-        self._games[key] = game
-        if guess:
-            self._play(irc, msg, channel, guess)
-            return
-        irc.reply(f'guess {length} letter words with the "guess" command.  good luck! ({channel},{msg.nick})')
+        nf = self.getDb(channel)
+
+        length = max(2, min(18,length))
+        n, c = msg.nick, msg.channel or ""
+        # if who:
+        #     n, c = "*", "*"
+        gid = nf.start(length, n, c)
+        irc.reply(f'Start nordl game #{gid}. Guess a word with {length} letters.  Good luck!')
         
-    @wrap(['channelDb'])
-    def board(self, irc, msg, args, channel):
+    @wrap(['channelDb', optional('int')])
+    def board(self, irc, msg, args, channel, gid):
+        '''[<chanel> <gameid>]
+
+        Show the full board of your last game or a specific game number
         '''
-        Show the full board of your last game'''
+
+        nf = self.getDb(channel)
+
+        if gid is None:
+            try:
+                gid = nf.last(msg.nick, msg.channel or "")
+            except IndexError:
+                irc.reply(f'no recent game for you in channel "{channel}"')
+                return
 
         try:
-            game = self._get_game(irc, msg, channel)
-        except KeyError:
+            gd = nf.game_data(gid)
+        except IndexError:
+            irc.reply(f'no recent game for you in channel "{channel}"')
             return
 
-        for count, (yn, line) in enumerate(game.board()):
-            irc.reply(f'{line} #{count}', prefixNick = False)
+        oc, gs = gd
+        lastnick = ""
+        for count, (guess, nick, _, _) in enumerate(gs):
+            lastnick = nick
+            if count == 0:
+                answer = guess
+                continue
+            codes = nordl.codify(guess, answer)
+            line = nordl.markdup(guess, codes, 'dark')
+            line += f' [{count}] {nick}'
+            irc.reply(line, prefixNick=False)
+        if oc is None:
+            irc.reply(f'game {gid} is still open', prefixNick=False)
+        elif oc:
+            irc.reply(f'game {gid} won by {lastnick}!', prefixNick=False)
+        else:
+            codes = nordl.codify(answer, answer)
+            line = nordl.markdup(answer, codes, 'dark')
+            line += f' game {gid} was given up'
+            irc.reply(line, prefixNick=False)
 
-    @wrap(['channelDb', 'something'])
-    def guess(self, irc, msg, args, channel, guess):
+
+    @wrap(['channelDb', 'something', optional('int')])
+    def guess(self, irc, msg, args, channel, guess, gid):
         '''<word>
         
-        Guess a word in an ongoing game'''
-        self._play(irc, msg, channel, guess)
-        
+        Guess a word in an ongoing game.
+        '''
+        nf = self.getDb(channel)
+
+        if gid is None:
+            try:
+                gid = nf.last(msg.nick, msg.channel or "")
+            except IndexError:
+                irc.reply(f'no recent game for you in channel "{channel}"')
+                return
+
+        try:
+            gotit = nf.guess(gid, guess, msg.nick, msg.channel or "")
+        except IndexError as err:
+            irc.reply(str(err))
+            return
+
+        answer = nf.answer(gid)
+        codes = nordl.codify(guess, answer)
+        line = nordl.markdup(guess, codes, 'dark')
+
+        if gotit:
+            irc.reply(f'{line} Correct!')
+        else:
+            irc.reply(f'{line}')
+
     @wrap(['channelDb'])
     def giveup(self, irc, msg, args, channel):
         '''
-        Bail on a game and learn the word'''
+        Bail on a game and learn the word.
+        '''
+        nf = self.getDb(channel)
+
         try:
-            game = self._get_game(irc, msg, channel)
-        except KeyError:
+            gid = nf.last(msg.nick, msg.channel or "")
+        except IndexError:
+            irc.reply(f'no recent game for you in channel "{channel}"')
             return
 
-        irc.reply(f'The word was "{game._word}"')
+        try:
+            answer = nf.giveup(gid, msg.nick, msg.channel or "")
+        except IndexError:
+            irc.reply(f'you can not give up game {gid}, already over or it is not yours')
+            return
+        irc.reply(f'the answer was "{answer}".  Better luck next time!')
 
+    @wrap(['channelDb'])
+    def scores(self, irc, msg, args, channel):
+        '''[channel]
+        Show top scores.
+        '''
+        nf = self.getDb(channel)
+        top = list()
+        all_scores = nf.scores(msg.channel or "")
+        print(all_scores)
+        for n, (g, c) in all_scores.items():
+            if g <= 0:
+                continue
+            pc = int(100.0*c/g)
+            top.append((-pc, f'{n}: {pc}% [{c}/{g}] '))
+        if not top:
+            irc.reply('no nordl game results yet, try "start"')
+            return
+        top.sort()
+        top = [t[1] for t in top]
+        line = ', '.join(top[:10])
+        irc.reply(line, prefixNick=False)
+        
+        
 
 Class = Nordl
 

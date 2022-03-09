@@ -1,1 +1,16 @@
 An n-char implementation of wordle
+
+* TODO
+
+- [ ] db to hold scores, past games
+- [ ] only allow real words
+- [ ] multiplayer
+- [ ] remove channelDB, take from msg.channel
+- [ ]  add wordle style @board 
+
+
+- [ ] Reject guesses of the wrong length
+
+- [ ]  reject guesses not also a word.
+
+- [ ] something may be wrong in how coloring works.  Prior to fixing above, guessing with all 26 letters did not light up some known to be in the word.
