@@ -1,0 +1,5 @@
+#+title: Comic generation feature from WeedBot of yore
+
+Now for limnoria.
+
+The directory ~./data~ must be copied to ~data/comic~ in the run directory.
