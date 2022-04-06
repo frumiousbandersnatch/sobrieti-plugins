@@ -5,7 +5,7 @@ Render a "comic" from attributed lines of text.
 # This is adapted from what began as nekosune's WeedBot comic.py
 
 import os
-from random import shuffle
+from random import shuffle, randint
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 
@@ -133,7 +133,10 @@ def make_comic(panels, datadir):
     backgrounds = random_images(datadir, 'backgrounds')
     background_file = backgrounds[0]
     bg = Image.open(background_file)
+    bgrow = randint(0, bg.size[0] - panelheight - 1)
+    bgcol = randint(0, bg.size[1] - panelwidth - 1)
 
+    
     im = Image.new("RGBA", (imgwidth, imgheight), (0xff, 0xff, 0xff, 0xff))
     font_file = str((datadir / "fonts/Comic.ttf").absolute())
     font_size = 14
@@ -142,7 +145,7 @@ def make_comic(panels, datadir):
 
     for i in range(len(panels)):
         pim = Image.new("RGBA", (panelwidth, panelheight), (0xff, 0xff, 0xff, 0xff))
-        pim.paste(bg, (0, 0))
+        pim.paste(bg, (-bgrow, -bgcol))
         draw = ImageDraw.Draw(pim)
 
         st1w = 0; st1h = 0; st2w = 0; st2h = 0
