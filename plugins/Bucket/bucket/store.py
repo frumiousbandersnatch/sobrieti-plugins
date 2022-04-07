@@ -49,7 +49,7 @@ class RandomGive:
     chosen.
 
     Note, there is no underflow protection.  If used when not holding
-    anything it will simply return the kind.
+    anything it will simply return some crap.
     '''
     def __init__(self, bs, kind='give'):
         self.bs = bs
@@ -57,7 +57,7 @@ class RandomGive:
     def __str__(self):
         held = self.bs.held_items()
         if not held:
-            return self.kind
+            return "blood from a stone"
         item = random.choice(held)
         self.bs.drop_item(item)
         return item

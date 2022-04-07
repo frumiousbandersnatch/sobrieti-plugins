@@ -722,10 +722,10 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         more.update(self.hist.more(msg), to=irc.nick)
         subject, link, tidbit = factoid
         tidbit = db.resolve(tidbit, **more)            
-        if link == 'reply':
+        if link.lower() == 'reply':
             irc.reply(tidbit, prefixNick=False)
             return
-        if link == 'action':
+        if link.lower() == 'action':
             if not addressed:
                 ## This is what should work but hits the assert.  val says
                 ## it's a bug so maybe it can be re-enabled in a future
@@ -735,7 +735,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
                 ## This works around the assert but tickles Misc to throw.
                 irc.noReply()
                 #msg.tag('repliedTo')
-                newMsg = ircmsgs.action(msg.channel, tidbit)# , msg=msg)
+                self.log.info(f'reply: channel:{msg.channel} tidbit:{tidbit}')
+                newMsg = ircmsgs.action(msg.channel or "", tidbit)# , msg=msg)
                 irc.queueMsg(newMsg)
 
             else:
