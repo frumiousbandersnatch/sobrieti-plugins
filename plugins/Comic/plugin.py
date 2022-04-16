@@ -61,7 +61,7 @@ class Comic(callbacks.Plugin):
         if not msg.channel:
             return
         text = ircmsgs.prettyPrint(msg, showNick=False)
-        self.log.info(f'remember: {msg.nick} {msg.channel} {irc.network} {text}')
+        #self.log.info(f'remember: {msg.nick} {msg.channel} {irc.network} {text}')
         self.recent.remember(msg.nick, text, msg.channel, irc.network)
 
     @wrap(['channelDb'])
