@@ -35,7 +35,7 @@ import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 
 ud_api_base_url = \
-    'http://api.urbandictionary.com/v0/define?'
+    'https://api.urbandictionary.com/v0/define?'
 
 import urllib, urllib2, json
 import re

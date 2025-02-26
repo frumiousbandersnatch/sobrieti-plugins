@@ -305,6 +305,16 @@ class PosNeg(callbacks.Plugin, plugins.ChannelDBHandler):
         return
     joindb = wrap(joindb, ['channel','channel',optional('int')])
 
+    def inFilter(self, irc, msg):
+        """Quick hack to check if we can avoid non commands matching whenAddressed.chars"""
+        try:
+            a1 = msg.args[1]
+        except IndexError:
+            return msg
+        if a1.startswith(". "): # fixme: make configurable
+            msg.tag('addressed', False)
+        return msg
+
 # ~joindb #stopdrinking 2    
 # #stopdrinking #sobrietibot 2
 
