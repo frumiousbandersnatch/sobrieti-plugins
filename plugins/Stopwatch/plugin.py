@@ -35,20 +35,115 @@ from supybot.i18n import PluginInternationalization
 from collections import defaultdict
 
 import time
+from enum import Enum
 
 _ = PluginInternationalization('Stopwatch')
 
-def tfmt(then):
+def tfmt(dt):
     '''
-    Return string rep of time since then to now
+    Return string rep of a duration in seconds.
     '''
-    now = time.time()
-    dt = now - then
     hours = int(dt // 3600)
     minutes = int((dt % 3600) // 60)
     seconds = int(dt % 60)
     return f'{hours}:{minutes:02}:{seconds:02}'
 
+class State(Enum):
+    """State machine states."""
+    READY = 1
+    RUNNING = 2
+    PAUSED = 3
+    STOPPED = 4
+
+class Timer:
+    def __init__(self):
+        self.state = State.READY
+        self.accrued = 0        # add to this when paused
+        self.started = None     # when running started
+
+    @property
+    def since(self):
+        if self.started is None:
+            return
+        return time.time() - self.started
+
+    def __str__(self):
+        if self.state == State.READY:
+            return f'ready'
+
+        if self.state == State.RUNNING:
+            t = self.accrued + self.since
+            return f'{tfmt(t)} (running)'
+
+        if self.state == State.PAUSED:
+            return f'{tfmt(self.accrued)} (paused)'
+
+        if self.state == State.STOPPED:
+            return f'{tfmt(self.accrued)} (stopped)'
+
+        raise ValueError(f'illegal state: {self.state}')
+
+    def __repr__(self):
+        return str(self)
+
+    def start(self):
+        """Transition from READY to RUNNING."""
+        if self.state == State.READY:
+            self.state = State.RUNNING
+            self.accrued = 0
+            self.started = time.time()
+            return str(self)
+        else:
+            return f"cannot start in state {self.state.name}"
+
+    def pause(self):
+        """Transition from RUNNING to PAUSED."""
+        if self.state == State.RUNNING:
+            self.state = State.PAUSED
+            self.accrued += time.time() - self.started
+            self.started = None
+            return str(self)
+        elif self.state == State.PAUSED:
+            return str(self)
+        else:
+            return f"cannot pause in state {self.state.name}"
+
+    def resume(self):
+        """Transition from PAUSED to RUNNING."""
+        if self.state == State.PAUSED:
+            self.state = State.RUNNING
+            self.started = time.time()
+            return str(self)
+        elif self.state == State.RUNNING:
+            return str(self)
+        else:
+            return f"cannot resume in state {self.state.name}"
+
+    def stop(self):
+        """Transition from RUNNING to STOPPED."""
+        if self.state == State.RUNNING or self.state == State.PAUSED:
+            self.state = State.STOPPED
+            if self.started:
+                self.accrued += time.time() - self.started
+            self.started = None
+            return str(self)
+        elif self.state == State.STOPPED:
+            return str(self)
+        else:
+            return f"cannot stop in state {self.state.name}"
+
+    def reset(self):
+        """Transition from STOPPED to READY."""
+        if self.state in (State.STOPPED, State.RUNNING, State.PAUSED):
+            self.state = State.READY
+            self.accrued = 0
+            self.started = None
+            return str(self)
+        elif self.state == State.READY:
+            return str(self)
+        else:
+            return f"cannot reset in state {self.state.name}"
+    
 
 class Stopwatch(callbacks.Plugin):
     """Maintain stopwatch timers"""
@@ -56,47 +151,80 @@ class Stopwatch(callbacks.Plugin):
         super().__init__(irc)
         self.channel_timers = defaultdict(dict)
 
+    def _get(self, channel, name):
+        timers = self.channel_timers[channel]
+        if name in timers:
+            return timers[name]
+        timer = Timer()
+        timers[name] = timer
+        return timer
+
     def start(self, irc, msg, args, channel, name):
         """[<channel> <name>]
 
         Start the stopwatch.
         """
-        timers = self.channel_timers[channel]
-        if name in timers:
-            old_time = timers[name]
-            timers[name] = time.time()
-            irc.reply(f'restarted timer "{name}" (was {tfmt(old_time)}')
-            return
-        timers[name] = time.time()
-        irc.reply(f'started timer "{name}"')
+        timer = self._get(channel, name)
+        irc.reply(f'{name}: {timer.start()}')
     start = wrap(start, ['channel', 'something'])
-
 
     def stop(self, irc, msg, args, channel, name):
         """[<channel> <name>]
 
         Stop the stopwatch and display elapsed time.
         """
-        timers = self.channel_timers[channel]
-        if name in timers:
-            old_time = timers[name]
-            del (timers[name])
-            irc.reply(f'stopped timer "{name}" after {tfmt(old_time)}')
-            return
-        irc.reply(f'no timer "{name}"')
+        timer = self._get(channel, name)
+        irc.reply(f'{name}: {timer.stop()}')
     stop = wrap(stop, ['channel', 'something'])
 
+    def pause(self, irc, msg, args, channel, name):
+        """[<channel> <name>]
+
+        Puase the stopwatch and display elapsed time.
+        """
+        timer = self._get(channel, name)
+        irc.reply(f'{name}: {timer.pause()}')
+    pause = wrap(pause, ['channel', 'something'])
+
+    def resume(self, irc, msg, args, channel, name):
+        """[<channel> <name>]
+
+        Resume a paused stopwatch and display elapsed time.
+        """
+        timer = self._get(channel, name)
+        irc.reply(f'{name}: {timer.resume()}')
+    resume = wrap(resume, ['channel', 'something'])
+
+    def reset(self, irc, msg, args, channel, name):
+        """[<channel> <name>]
+
+        Reset a stopwatch and display elapsed time.
+        """
+        timer = self._get(channel, name)
+        irc.reply(f'{name}: {timer.reset()}')
+    reset = wrap(reset, ['channel', 'something'])
+
+    def remove(self, irc, msg, args, channel, name):
+        """[<channel> <name>]
+
+        Reove a stopwatch and display elapsed time.
+        """
+        timers = self.channel_timers[channel]
+        if name in timers:
+            timer = timers[name]
+            del (timers[name])
+            irc.reply(f'{name}: {timer} (removed)')
+            return
+        irc.reply(f'no timer to remove: {name}')
+    remove = wrap(remove, ['channel', 'something'])
+    
     def lap(self, irc, msg, args, channel, name):
         """[<channel> <name>]
 
         Display current elapsed time without stopping the stopwatch.
         """
-        timers = self.channel_timers[channel]
-        if name in timers:
-            t = timers[name]
-            irc.reply(f'{tfmt(t)} "{name}"')
-            return
-        irc.reply(f'no timer "{name}"')
+        timer = self._get(channel, name)
+        irc.reply(f'{name}: {timer}')
     lap = wrap(lap, ['channel', 'something'])
 
     def show(self, irc, msg, args, channel):
@@ -104,13 +232,12 @@ class Stopwatch(callbacks.Plugin):
 
         List all running timers.
         """
-        timers = self.channel_timers[channel]
-        if not timers:
-            irc.reply("no timers started")
+        answer = list()
+        for name, timer in self.channel_timers[channel].items():
+            answer.append(f'{name}: {timer}')
+        if not answer:
+            irc.reply("no timers defined")
             return
-        answer = []
-        for name, tim in timers.items():
-            answer.append(f'{tfmt(tim)} "{name}"')
         irc.reply(', '.join(answer))
     show = wrap(show, ['channel'])
 
