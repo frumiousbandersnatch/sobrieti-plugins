@@ -49,7 +49,7 @@ class RandomGive:
     chosen.
 
     Note, there is no underflow protection.  If used when not holding
-    anything it will simply return the kind.
+    anything it will simply return some crap.
     '''
     def __init__(self, bs, kind='give'):
         self.bs = bs
@@ -57,7 +57,7 @@ class RandomGive:
     def __str__(self):
         held = self.bs.held_items()
         if not held:
-            return self.kind
+            return "blood from a stone"
         item = random.choice(held)
         self.bs.drop_item(item)
         return item
@@ -99,7 +99,7 @@ class Bucket:
         Return the term (kind,text) for the term ID.
         '''
         cur = self.db.cursor()
-        got = cur.execute("SELECT kind,text FROM terms WHERE id=?", (tid,))
+        got = cur.execute("SELECT kind,text FROM terms WHERE id=? COLLATE NOCASE", (tid,))
         return got.fetchone()
 
     def term(self, text, kind, commit=True, creator=""):
@@ -110,7 +110,7 @@ class Bucket:
         commit for much greater speed. 
         '''
         cur = self.db.cursor()
-        got = cur.execute("SELECT id FROM terms WHERE kind=? AND text=?",
+        got = cur.execute("SELECT id FROM terms WHERE kind=? AND text=? COLLATE NOCASE",
                           (kind, text)).fetchone()
         if got:
             #print ("OLD TERM ID:",got[0])
@@ -130,7 +130,7 @@ class Bucket:
         Return list of term texts of given kind
         '''
         cur = self.db.cursor()
-        got = cur.execute("SELECT text,id FROM terms WHERE kind=? ORDER BY id",
+        got = cur.execute("SELECT text,id FROM terms WHERE kind=? COLLATE NOCASE ORDER BY id",
                           (kind, )).fetchall()
         if return_ids:
             return got
@@ -142,7 +142,7 @@ class Bucket:
         '''
         cur = self.db.cursor()
         got = cur.execute("""SELECT text FROM terms
-        WHERE kind=? ORDER BY RANDOM() LIMIT 1""",(kind,)).fetchone()
+        WHERE kind=? COLLATE NOCASE ORDER BY RANDOM() LIMIT 1""",(kind,)).fetchone()
         if not got:
             raise KeyError(f'no terms of kind "{kind}"')
         return got[0]       # singlets returned from db as (s,)
@@ -164,13 +164,13 @@ class Bucket:
         These are as defined in terms.kind plus some "system" kinds.
         '''
         cur = self.db.cursor()
-        got = cur.execute("SELECT DISTINCT kind FROM terms")
+        got = cur.execute("SELECT DISTINCT kind FROM terms COLLATE NOCASE")
         s = set([one[0] for one in got.fetchall()])
         return s.union(self.system_kinds())
 
     def num_kind(self, kind='item'):
         cur = self.db.cursor()
-        got = cur.execute("SELECT count(*) FROM terms WHERE kind=?",
+        got = cur.execute("SELECT count(*) FROM terms WHERE kind=? COLLATE NOCASE",
                           (kind,))
         return got.fetchone()[0]
             
@@ -238,7 +238,7 @@ class Bucket:
         LEFT JOIN terms subject ON subject.id = fact.subject_id
         LEFT JOIN terms link    ON link.id    = fact.link_id
         LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
-        WHERE fact.id=?""", (fid,)).fetchone()
+        WHERE fact.id=? COLLATE NOCASE""", (fid,)).fetchone()
 
     def factoidid(self, factoid):
         '''
@@ -250,7 +250,7 @@ class Bucket:
         LEFT JOIN terms subject ON subject.id = fact.subject_id
         LEFT JOIN terms link    ON link.id    = fact.link_id
         LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
-        WHERE subject.text=? and link.text=? and tidbit.text=?""", factoid)
+        WHERE subject.text=? and link.text=? and tidbit.text=? COLLATE NOCASE""", factoid)
         if got:
             return got.fetchone()[0]
         return
@@ -288,7 +288,7 @@ class Bucket:
 
         got = self.sql("""
         SELECT created_by FROM terms 
-        WHERE kind='subject' AND text=?
+        WHERE kind='subject' AND text=? COLLATE NOCASE
         """, (subject,)).fetchone()
         if not got:
             return None
@@ -313,7 +313,8 @@ class Bucket:
           LEFT JOIN terms subject ON subject.id = fact.subject_id
           LEFT JOIN terms link    ON link.id    = fact.link_id
           LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
-          WHERE subject.text=? AND link.text=? AND tidbit.text=?
+          WHERE subject.text=? AND link.text=? AND tidbit.text=? 
+          COLLATE NOCASE
         )""", (subject, link, tidbit))
 
     def recent_factoids(self, limit=10,
@@ -347,6 +348,7 @@ class Bucket:
         LEFT JOIN terms link    ON link.id    = fact.link_id
         LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
         {extra}
+        COLLATE NOCASE
         ORDER BY fact.created_at DESC LIMIT ?""", (limit,))
         if return_ids and return_facts:
             return [(one[0], one[1:]) for one in got.fetchall()]
@@ -373,6 +375,7 @@ class Bucket:
             FROM facts 
             INNER JOIN terms on terms.id = subject_id
             WHERE terms.text=?
+            COLLATE NOCASE
             ORDER BY RANDOM() LIMIT 1""", (subject,)).fetchone()
             if not got:
                 raise KeyError(f'no facts for subject "{subject}"')
@@ -391,6 +394,7 @@ class Bucket:
         LEFT JOIN terms link    ON link.id    = fact.link_id
         LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
         WHERE subject.text=? and tidbit.text like ?
+        COLLATE NOCASE
         ORDER BY RANDOM() LIMIT 1
         """, (subject, '%'+fragment+'%')).fetchone()
         if not got:
@@ -408,6 +412,7 @@ class Bucket:
         LEFT JOIN terms subject ON subject.id = fact.subject_id
         LEFT JOIN terms link    ON link.id    = fact.link_id
         LEFT JOIN terms tidbit  ON tidbit.id  = fact.tidbit_id
+        COLLATE NOCASE
         WHERE subject.text=?""", (subject,)).fetchall()
         if not got:
             return dict()
@@ -453,7 +458,7 @@ class Bucket:
         cur = self.db.cursor()
         cur.execute("""DELETE FROM holding WHERE item_id in 
         ( SELECT id FROM terms 
-          WHERE terms.kind='item' AND terms.text=? )""",
+          WHERE terms.kind='item' AND terms.text=? COLLATE NOCASE)""",
                     (item,))
         self.db.commit()
 

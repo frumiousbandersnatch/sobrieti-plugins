@@ -361,6 +361,16 @@ supybot commands
 
 * Bugs
 
+- [ ] Do something smarter when the active terms can not be satisfied
+
+#+begin_example
+<me> pale, I want a present               
+     *pale gives TacticalBurrito $giveitem.
+#+end_example
+
+xkcd bucket will return a banana forever.
+
+
 - [X] Addressed with a space should not trigger the bot.  
 
 #+begin_example

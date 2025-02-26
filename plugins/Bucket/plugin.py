@@ -152,14 +152,16 @@ class TransientHistory:
 
 class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     """Mostly compatible implementation of XKCD Bucket"""
-    threaded = True
+    threaded = False
     public = True
     regexps = []
     addressedRegexps = ["a_re_goaway", "a_re_comeback",
                         "a_re_factoid", "a_re_explain", "a_re_matchlike",
-                        "junk_addr"]
+                        #"junk_addr"
+                        ]
     unaddressedRegexps = ["un_re_say", "un_re_items1", "un_re_items2",
-                          "junk_unaddr"]
+                          #"junk_unaddr"
+                          ]
 
     def __init__(self, irc):
         callbacks.PluginRegexp.__init__(self, irc)
@@ -171,23 +173,25 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         return bucket.store.Bucket(filename)
 
     def invalidCommand(self, irc, msg, tokens):
-        self.log.info(f'Bucket({irc.nick}): invalidCommand(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, tokens:|{repr(tokens)}|)')
+        self.log.debug(f'Bucket({irc.nick}): invalidCommand(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, tokens:|{repr(tokens)}|)')
 
         if msg.args[1].startswith(irc.nick + ' '):
-            self.log.info(f'Bucket({irc.nick}): not replying to space-nick')
+            self.log.debug(f'Bucket({irc.nick}): not replying to space-nick')
             irc.noReply()
             return
 
         # fixme: call this block via super(), for now we chirp inside
         s = ' '.join(tokens)
         for (r, name) in self.addressedRes:
-            self.log.info(f'Bucket: dispatch addressed meth:|{name}| regex:|{repr(r)}| string:|{repr(s)}|')
+            self.log.debug(f'Bucket: dispatch addressed meth:|{name}| regex:|{repr(r)}| string:|{repr(s)}|')
             for m in r.finditer(s):
                 self._callRegexp(name, irc, msg, m)
                 if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
+                    self.log.debug(f'Bucket: regex satisfied {msg.tags}')
                     return
+        self.log.debug(f'Bucket: regex not satisfied')
 
-        self.log.info(f'Bucket: invalidCommand: tags: {msg.tags}')
+        self.log.debug(f'Bucket: invalidCommand: tags: {msg.tags}')
         if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
             return
         self._reply(irc, msg, 'factoid-unknown', thesubject=msg.addressed)
@@ -196,13 +200,14 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         self.hist.add_msg(msg)
 
         if self.meek[msg.channel]:
-            self.log.info(f'MEEK: ignoring unaddressed: "{msg.args}"')
+            self.log.debug(f'MEEK: ignoring unaddressed: "{msg.args}"')
             irc.noReply()
             return
 
         # unaddressed
         callbacks.PluginRegexp.doPrivmsg(self, irc, msg)
         if 'ignored' in msg.tags or 'repliedTo' in msg.tags:
+            self.log.debug(f'privmsg handled by regex: {msg.tags}')
             return
 
         # fixme: use configured 
@@ -211,17 +216,20 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             return
 
         line = msg.args[1]
-        self.log.info(f'UNMATCHED1: str:|{line}| repr:|{repr(line)}|')
+        self.log.debug(f'UNMATCHED1: str:|{line}| repr:|{repr(line)}|, tags: {msg.tags}')
         got = re.compile('\x01ACTION (?P<line>.*?)\x01').match(line)
         if got:
             line = got['line']
-            self.log.info(f'UNMATCHED2: str:|{line}| repr:|{repr(line)}|')
+            self.log.debug(f'UNMATCHED2: str:|{line}| repr:|{repr(line)}|')
 
         # OG bucket seems to not freely reply to "hi" but will to others.
         min_to_reply = self.registryValue('min_to_reply')
         if len(msg.args[1]) < min_to_reply:
             return
 
+        if line.startswith(irc.nick):
+            return
+        
         self._reply(irc, msg, line, addressed=False)
         
 
@@ -230,7 +238,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         text = regex["sentence"]
         # fixme: strip off non-word chars from text
         text = text.capitalize() + "!"
-        self.log.info(f'say: msg:|{msg}|, regex:|{regex}| -> |{text}|')
+        self.log.debug(f'say: msg:|{msg}|, regex:|{regex}| -> |{text}|')
         irc.reply(text, prefixNick=False)
 
 
@@ -267,7 +275,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
             self._reply(irc, msg, 'factoid-empty', thesubject=subject)
             return
 
-        self.log.info(f'literal: "{subject}": {lines}')
+        self.log.debug(f'literal: "{subject}": {lines}')
         body = ' |'.join(lines)
         reply = f'{subject}: |{body}'
         irc.reply(reply)
@@ -415,7 +423,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
         Do things with factoids.  Some need 'op' capability.
         """
-        self.log.info(f'FACTOIDS: cmd:|{repr(cmd)}| ident:|{repr(ident)}|')
+        self.log.debug(f'FACTOIDS: cmd:|{repr(cmd)}| ident:|{repr(ident)}|')
 
         db = self.getDb(channel)
         if cmd == "show":
@@ -534,7 +542,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
         me = regex["nick"]
         if me != irc.nick:
-            self.log.info(f'itemsx: {me} is not {irc.nick}')
+            self.log.debug(f'itemsx: {me} is not {irc.nick}')
             return
 
         item = regex["item"]
@@ -566,26 +574,30 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     # /me gives {item} to Bucket
     def un_re_items1(self, irc, msg, regex):
         r"^\x01ACTION (?:gives|puts) (?P<item>.+?) (?:to|in) (?P<nick>[^ ]+?)\x01$"
-        self.log.info(f"items1: {regex.groups()}")
+        self.log.debug(f'say: msg:|{msg}|, regex:|{regex}|')
+        self.log.debug(f"items1: {regex.groups()}")
         self._itemsx(irc, msg, regex)
 
     # /me gives Bucket {item}
     def un_re_items2(self, irc, msg, regex):
         r"^\x01ACTION gives (?P<nick>[^ ]+) (?P<item>.+?)\x01$"
-        self.log.info(f"items2: {regex.groups()}")
+        self.log.debug(f"items2: {regex.groups()}")
         self._itemsx(irc, msg, regex)
 
     # fixme, seek optional "bot, " or "bot: " prefix so when I forget
     # and explicitly address the bot in PM it will do the right thing.
     def a_re_factoid(self, irc, msg, regex):
-        r"^(?P<subject>.*) +(?P<link>is|are|[<][^>]+[>]) +(?P<tidbit>.*)$"
+        r"^(?P<subject>.*?)\s+(?P<link>is|<[^>]+>|are)\s+(?P<tidbit>.*)$"
+        # r"^(?P<subject>.*) +(?P<link>[<][^>]+[>]|is|are) +(?P<tidbit>.*)$"
+        self.log.debug(f'factoid: msg:|{msg}|, regex:|{regex}|')
+        self.log.debug(f'factoid: regex dict: {regex.groupdict()}')
         chan = msg.args[0]
         db = self.getDb(chan)
 
         subject = regex['subject']
         creator = self._getUsername(msg)
         if db.is_system_fact(subject):
-            self.log.info(f'factoid: is system: "{subject}"')
+            self.log.debug(f'factoid: is system: "{subject}"')
             creator = db.system_nick
             cap_needed = 'system'
             if not self._isCapable(msg, cap_needed):
@@ -612,7 +624,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
     def a_re_explain(self, irc, msg, regex):
         r"^(?P<subject>((?!\s*is|are|[<][^>]+[>]).)*)$"
-        self.log.info(f'explain: msg:|{msg}|, regex:|{regex}|')
+        self.log.debug(f'explain: msg:|{msg}|, regex:|{regex}|')
         chan = msg.args[0]
         db = self.getDb(chan)
         subject = regex['subject']
@@ -624,6 +636,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
 
     def a_re_matchlike(self, irc, msg, regex):
         r"^(?P<subject>(?!\s*=!.)*) =~ (?P<match>.*)$"
+        self.log.debug(f'matchlike: msg:|{msg}|, regex:|{regex}|')
+
         chan = msg.args[0]
         db = self.getDb(chan)
         subject = regex['subject']
@@ -638,18 +652,18 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     def _set_come_back_event(self, channel, delay):
         'Set a come back event for channel for delay seconds in the future and go meek'
         event = self._del_come_back_event(channel)
-        self.log.info(f'MEEK: set event "{event}"')
+        self.log.debug(f'MEEK: set event "{event}"')
         self.meek[channel] = True
         later = time.time() + delay
         def restore():
-            self.log.info("MEEK: I'm back, biatch!")
+            self.log.debug("MEEK: I'm back, biatch!")
             self.meek[channel] = False
         schedule.addEvent(restore, later, name=event)
 
     def _del_come_back_event(self, channel):
         'remove come back event for channel if there and stop being meek'
         event = channel+'_come_back'
-        self.log.info(f'MEEK: del event "{event}"')
+        self.log.debug(f'MEEK: del event "{event}"')
         try:
             schedule.removeEvent(event)
         except KeyError:
@@ -660,6 +674,8 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
     def a_re_goaway(self, irc, msg, regex):
         r"^(?P<what>go away|fuck off|shut up)$"
         # people can be so cruel
+        self.log.debug(f'goaway: msg:|{msg}|, regex:|{regex}|')
+
         if not msg.channel:
             irc.reply("Yell at me in a channel, not in a PM")
             return
@@ -669,6 +685,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         
     def a_re_comeback(self, irc, msg, regex):
         r"^(?P<what>come back)$"
+        self.log.debug(f'comeback: msg:|{msg}|, regex:|{regex}|')
         if not msg.channel:
             irc.reply("No channel to come back to")
             return
@@ -705,14 +722,14 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         chan = msg.args[0]
         db = self.getDb(chan)
 
-        self.log.info(f'Bucket: _reply(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, factoid:|{repr(factoid)}|)')
+        self.log.debug(f'Bucket: _reply(msg:|[{repr(msg.args[0])}, {repr(msg.args[1])}]|, factoid:|{repr(factoid)}|)')
 
         if isinstance(factoid, str):
             try:
                 factoid = db.choose_factoid(factoid)
             except KeyError:
                 return
-            self.log.info(f'Bucket: _reply() convert factoids: {factoid}')
+            self.log.debug(f'Bucket: _reply() convert factoids: {factoid}')
 
         if msg.channel and not db.is_system_fact(factoid[0]):
             self.hist.add_factoid(msg.channel, factoid)
@@ -720,10 +737,10 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         more.update(self.hist.more(msg), to=irc.nick)
         subject, link, tidbit = factoid
         tidbit = db.resolve(tidbit, **more)            
-        if link == 'reply':
+        if link.lower() == 'reply':
             irc.reply(tidbit, prefixNick=False)
             return
-        if link == 'action':
+        if link.lower() == 'action':
             if not addressed:
                 ## This is what should work but hits the assert.  val says
                 ## it's a bug so maybe it can be re-enabled in a future
@@ -733,15 +750,18 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
                 ## This works around the assert but tickles Misc to throw.
                 irc.noReply()
                 #msg.tag('repliedTo')
-                newMsg = ircmsgs.action(msg.channel, tidbit)# , msg=msg)
+                newMsg = ircmsgs.action(msg.channel or "", tidbit)# , msg=msg)
                 irc.queueMsg(newMsg)
+                self.log.info(f'action: queued msg to channel:{msg.channel} tidbit:{tidbit}, {msg.tags}')
 
             else:
                 ## This work-around works for addressed
                 irc.reply(tidbit, action=True, noLengthCheck=True)
+                self.log.info(f'action: addressed to channel:{msg.channel} tidbit:{tidbit}, {msg.tags}')
             return
         reply = ' '.join([subject, link, tidbit])
         irc.reply(reply, prefixNick=addressed)
+        self.log.info(f'{link}: to channel:{msg.channel} tidbit:{tidbit}, {msg.tags}')
 
     def _getUsername(self, msg):
         try:
@@ -761,7 +781,7 @@ class Bucket(callbacks.PluginRegexp, plugins.ChannelDBHandler):
         tf = ircdb.checkCapability(msg.prefix, capability,
                                    ignoreDefaultAllow=True,
                                    ignoreChannelOp=True)
-        self.log.info(f'isCapable: "{msg.prefix}" in "{msg.channel}" for {capability} "{cap}" -> {tf}')
+        self.log.debug(f'isCapable: "{msg.prefix}" in "{msg.channel}" for {capability} "{cap}" -> {tf}')
         return tf
 
     @wrap(['channeldb', 'text'])
