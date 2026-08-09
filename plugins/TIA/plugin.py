@@ -153,8 +153,8 @@ class TIA(callbacks.Plugin):
     def do319(self, irc, msg):
         """/whois"""
 
-        print 'msg:',msg
-        print 'msg.args:',msg.args
+        print('msg:', msg)
+        print('msg.args:', msg.args)
 
         stamp = datetime.datetime(*time.gmtime()[:6])
         nick = msg.args[1]

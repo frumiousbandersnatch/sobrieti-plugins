@@ -53,7 +53,6 @@ __url__ = '' # 'http://supybot.com/Members/yourname/Yow/download'
 
 from . import config
 from . import plugin
-from imp import reload
 # In case we're being reloaded.
 importlib.reload(config)
 importlib.reload(plugin)

@@ -37,17 +37,17 @@ import supybot.callbacks as callbacks
 ud_api_base_url = \
     'https://api.urbandictionary.com/v0/define?'
 
-import urllib, urllib2, json
+import urllib.request, urllib.parse, json
 import re
 
 def udquery(term, page=1):
-    print 'URBAN: looking up term="%s", page=%d' % (term,page)
+    print('URBAN: looking up term="%s", page=%d' % (term,page))
 
-    url = ud_api_base_url + urllib.urlencode(locals())
-    res = urllib2.urlopen(url)
+    url = ud_api_base_url + urllib.parse.urlencode(locals())
+    res = urllib.request.urlopen(url)
     page = res.read()
     return json.loads(page)
-    
+
 def format_result(res, number, pat):
     defi = dict(res['list'][number-1])
     defi['number'] = number
@@ -56,7 +56,7 @@ def format_result(res, number, pat):
     defi['result_type'] = res['result_type']
 
     res = pat % defi
-    return re.sub('\s+',' ',res)
+    return re.sub(r'\s+',' ',res)
 
 class Urban(callbacks.Plugin):
     """Lookup hip Internet terms"""
@@ -89,7 +89,7 @@ class Urban(callbacks.Plugin):
 
         try:
             res = self._get(term,page)
-        except Exception, err:
+        except Exception as err:
             irc.reply('Sorry, urbandictionary is to hip to answer us (%s)' % err)
         res_type = res['result_type']
         nres = len(res['list'])

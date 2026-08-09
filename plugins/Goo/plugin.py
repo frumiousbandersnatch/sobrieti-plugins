@@ -48,7 +48,7 @@ class Grab(web.urllib.URLopener):
 
 def google_ajax(query):
     """Search using AjaxSearch, and return its JSON."""
-    if isinstance(query, unicode):
+    if isinstance(query, str):
         query = query.encode('utf-8')
     uri = 'http://ajax.googleapis.com/ajax/services/search/web'
     args = '?v=1.0&safe=off&q=' + web.urllib.quote(query)
@@ -63,14 +63,14 @@ def google_search(query):
     try: return results['responseData']['results'][0]['unescapedUrl']
     except IndexError: return None
     except TypeError:
-        print results
+        print(results)
         return False
 
 def google_count(query):
     results = google_ajax(query)
-    if not results.has_key('responseData'): return '0'
-    if not results['responseData'].has_key('cursor'): return '0'
-    if not results['responseData']['cursor'].has_key('estimatedResultCount'):
+    if 'responseData' not in results: return '0'
+    if 'cursor' not in results['responseData']: return '0'
+    if 'estimatedResultCount' not in results['responseData']['cursor']:
         return '0'
     return results['responseData']['cursor']['estimatedResultCount']
 

@@ -309,7 +309,7 @@ class Snoo(callbacks.Plugin):
         lst = meth(limit=1)
         try:
             lst = [x for x in lst]
-        except ValueError,err:
+        except ValueError as err:
             irc.reply("reddit barfed, sorry")
             return
 

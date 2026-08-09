@@ -17,6 +17,5 @@ def configure(advanced):
     conf.registerPlugin(PluginName, True)
 
 P = conf.registerPlugin(PluginName)
-P.__name__ = PluginName
 
 # vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=79:

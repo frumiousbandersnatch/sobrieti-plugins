@@ -34,10 +34,9 @@ import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 from supybot.i18n import PluginInternationalization, internationalizeDocstring
-import urllib
-from urllib2 import urlopen
+import urllib.parse
+from urllib.request import urlopen
 import json
-from BeautifulSoup import BeautifulSoup
 
 _ = PluginInternationalization('Meme')
 
@@ -85,7 +84,7 @@ class Meme(callbacks.Plugin):
         self.log.debug('Meme.search: "%s"' % term)
         cmd = 'Generators_Search'
         urlbase = "http://version1.api.memegenerator.net/%s?%s"
-        url = urlbase % (cmd, urllib.urlencode({'q':term,
+        url = urlbase % (cmd, urllib.parse.urlencode({'q':term,
                                                 'pageIndex':0,
                                                 'pageSize':maxHits}))
         self.log.debug('Meme.search: url: %s' % url)
