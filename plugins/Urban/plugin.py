@@ -53,7 +53,6 @@ def format_result(res, number, pat):
     defi['number'] = number
     defi['total'] = res.get('total',len(res['list']))
     defi['pages'] = res.get('pages',0)
-    defi['result_type'] = res['result_type']
 
     res = pat % defi
     return re.sub(r'\s+',' ',res)
@@ -91,14 +90,12 @@ class Urban(callbacks.Plugin):
             res = self._get(term,page)
         except Exception as err:
             irc.reply('Sorry, urbandictionary is to hip to answer us (%s)' % err)
-        res_type = res['result_type']
+            return
         nres = len(res['list'])
 
         #self.log.debug('%d results:' % nres)
-        #for one in res['list']:
-        #    self.log.debug(str(one))
 
-        if res_type == 'no_results':
+        if nres == 0:
             irc.reply('No hip definition for "%s"' % term)
             return
 
@@ -109,12 +106,10 @@ class Urban(callbacks.Plugin):
                           (isare, nres, res_type, term))
             return
 
-        if res_type in ['fulltext', 'exact']:
-            irc.reply(format_result(res, number, pattern),
-                      prefixNick=False)
-            return
-        irc.reply('Unexpected result type: "%s"' % res_type)
+        irc.reply(format_result(res, number, pattern),
+                  prefixNick=False)
         return
+
     ud = wrap(ud, [optional('int',1), many('something')])
 
 

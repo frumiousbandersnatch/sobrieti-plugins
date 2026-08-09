@@ -46,5 +46,6 @@ Urban = conf.registerPlugin('Urban')
 #     registry.Boolean(False, """Help for someConfigVariableName."""))
 
 conf.registerGlobalValue(Urban, 'resultFormat',
-     registry.String('[%(number)d/%(total)d] (+%(thumbs_up)d/-%(thumbs_down)d) \"%(word)s\" definition: %(definition)s example: %(example)s By %(author)s. (%(result_type)s) match.', """The pattern for displaying results."""))
+     registry.String('[%(number)d/%(total)d] (+%(thumbs_up)d/-%(thumbs_down)d) \"%(word)s\" definition: %(definition)s example: %(example)s By %(author)s.',
+                     """The pattern for displaying results."""))
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
