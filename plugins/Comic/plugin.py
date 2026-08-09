@@ -41,12 +41,12 @@ except ImportError:
 from io import BytesIO
 from importlib import reload
 from . import comic
-from . import history 
-from . import publish 
+from . import history
+from . import store
 # reload for live developing/debugging
 reload(comic)
 reload(history)
-reload(publish)
+reload(store)
 
 class Comic(callbacks.Plugin):
     """Comic generation feature from WeedBot of yore"""
@@ -76,13 +76,19 @@ class Comic(callbacks.Plugin):
             irc.reply("too quiet, no funnies")
             return
 
+        outdir = self.registryValue('outputDir')
+        baseurl = self.registryValue('baseUrl')
+        if not outdir or not baseurl:
+            irc.reply("Comic plugin is not configured: set "
+                       "supybot.plugins.Comic.outputDir and .baseUrl")
+            return
+
         panels = comic.make_panels(events)
         im = comic.make_comic(panels, self.datadir)
         dat = BytesIO()
         im.save(dat, "JPEG")
-        dat.seek(0)
-        rep = publish.post(dat)
-        irc.reply(rep)
+        url = store.save(dat.getvalue(), outdir, baseurl, suffix=".jpg")
+        irc.reply(url)
 
 Class = Comic
 

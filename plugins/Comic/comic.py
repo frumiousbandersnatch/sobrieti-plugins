@@ -23,10 +23,14 @@ def wrap(st, font, draw, width):
     mh = 0
     ret = []
 
+    def textsize(text):
+        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+        return right - left, bottom - top
+
     while len(st) > 0:
         s = 1
         while True and s < len(st):
-            w, h = draw.textsize(" ".join(st[:s]), font=font)
+            w, h = textsize(" ".join(st[:s]))
             if w > width:
                 s -= 1
                 break
@@ -36,7 +40,7 @@ def wrap(st, font, draw, width):
         if s == 0 and len(st) > 0:  # we've hit a case where the current line is wider than the screen
             s = 1
 
-        w, h = draw.textsize(" ".join(st[:s]), font=font)
+        w, h = textsize(" ".join(st[:s]))
         mw = max(mw, w)
         mh += h
         ret.append(" ".join(st[:s]))
@@ -51,7 +55,8 @@ def rendertext(st, font, draw, pos):
     '''
     ch = pos[1]
     for s in st:
-        w, h = draw.textsize(s, font=font)
+        left, top, right, bottom = draw.textbbox((0, 0), s, font=font)
+        h = bottom - top
         draw.text((pos[0], ch), s, font=font, fill=(0xff, 0xff, 0xff, 0xff))
         ch += h
 
@@ -71,7 +76,7 @@ def fitimg(img, width, height):
     else:
         l = l1
 
-    return img.resize((int(l[0]), int(l[1])), Image.ANTIALIAS)
+    return img.resize((int(l[0]), int(l[1])), Image.Resampling.LANCZOS)
 
 def make_panels(events):
     '''

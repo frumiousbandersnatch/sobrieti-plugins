@@ -55,5 +55,14 @@ Comic = conf.registerPlugin('Comic')
 # conf.registerGlobalValue(Comic, 'data',
 #     registry.String('', "The directory holding backgrounds, chars and fonts."))
 
+conf.registerGlobalValue(Comic, 'outputDir',
+    registry.String('', _("""The local directory in which generated comic
+    images are saved.""")))
+
+conf.registerGlobalValue(Comic, 'baseUrl',
+    registry.String('', _("""The base URL from which files saved in
+    outputDir may be fetched.  Joined with the saved file's name to form
+    the URL reported to users.""")))
+
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
