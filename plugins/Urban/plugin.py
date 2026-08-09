@@ -48,11 +48,18 @@ def udquery(term, page=1):
     page = res.read()
     return json.loads(page)
 
+def strip_link_brackets(text):
+    """Remove the [brackets] UD wraps around words that link to other entries."""
+    return re.sub(r'[\[\]]', '', text)
+
 def format_result(res, number, pat):
     defi = dict(res['list'][number-1])
     defi['number'] = number
     defi['total'] = res.get('total',len(res['list']))
     defi['pages'] = res.get('pages',0)
+    for key in ('definition', 'example'):
+        if defi.get(key):
+            defi[key] = strip_link_brackets(defi[key])
 
     res = pat % defi
     return re.sub(r'\s+',' ',res)

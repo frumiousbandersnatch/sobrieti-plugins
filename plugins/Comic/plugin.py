@@ -54,6 +54,7 @@ class Comic(callbacks.Plugin):
 
     recent = history.DB()
     datadir = conf.supybot.directories.data.dirize("comic")
+    print(f'comic {datadir=}')
 
     def doPrivmsg(self, irc, msg):
         if ircmsgs.isCtcp(msg) and not ircmsgs.isAction(msg):
