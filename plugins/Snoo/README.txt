@@ -1,2 +1,0 @@
-Interface IRC with reddit.
-
